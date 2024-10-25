@@ -9,4 +9,5 @@ FROM amazoncorretto:22 AS runtime
 EXPOSE 8080:8080
 RUN mkdir /app
 COPY --from=build /home/gradle/src/build/libs/*.jar /app/shrtkt.jar
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0"
 ENTRYPOINT ["java","-jar","/app/shrtkt.jar"]
