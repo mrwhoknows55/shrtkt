@@ -1,7 +1,6 @@
 package xyz.avdt.plugins
 
 import com.codahale.metrics.Slf4jReporter
-import dev.hayden.KHealth
 import io.ktor.server.application.*
 import io.ktor.server.metrics.dropwizard.*
 import io.ktor.server.plugins.calllogging.*
@@ -10,7 +9,6 @@ import org.slf4j.event.Level
 import java.util.concurrent.TimeUnit
 
 fun Application.configureMonitoring() {
-    install(KHealth)
     install(DropwizardMetrics) {
         Slf4jReporter.forRegistry(registry)
             .outputTo(this@configureMonitoring.log)

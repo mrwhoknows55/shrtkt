@@ -15,13 +15,14 @@ Here's a list of features included in this project:
 
 | Name                                                                   | Description                                                                        |
 |------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-| [Exposed](https://start.ktor.io/p/exposed)                             | Adds Exposed database to your application                                          |
 | [Routing](https://start.ktor.io/p/routing)                             | Provides a structured routing DSL                                                  |
-| [Content Negotiation](https://start.ktor.io/p/content-negotiation)     | Provides automatic content conversion according to Content-Type and Accept headers |
 | [kotlinx.serialization](https://start.ktor.io/p/kotlinx-serialization) | Handles JSON serialization using kotlinx.serialization library                     |
-| [Call Logging](https://start.ktor.io/p/call-logging)                   | Logs client requests                                                               |
-| [KHealth](https://start.ktor.io/p/khealth)                             | A simple and customizable health plugin                                            |
+| [Content Negotiation](https://start.ktor.io/p/content-negotiation)     | Provides automatic content conversion according to Content-Type and Accept headers |
+| [Exposed](https://start.ktor.io/p/exposed)                             | Adds Exposed database to your application                                          |
 | [Metrics](https://start.ktor.io/p/metrics)                             | Adds supports for monitoring several metrics                                       |
+| [Call Logging](https://start.ktor.io/p/call-logging)                   | Logs client requests                                                               |
+| [Resources](https://start.ktor.io/p/resources)                         | Provides type-safe routing                                                         |
+| [CORS](https://start.ktor.io/p/cors)                                   | Enables Cross-Origin Resource Sharing (CORS)                                       |
 
 ## Building & Running
 
