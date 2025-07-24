@@ -11,8 +11,10 @@ fun main(args: Array<String>) {
     EngineMain.main(args)
 }
 
-fun Application.module() {
-    configureMonitoring()
+fun Application.module(isTesting: Boolean = false) {
+    if (!isTesting) {
+        configureMonitoring()
+    }
     configureDatabases()
     configureSerialization()
 

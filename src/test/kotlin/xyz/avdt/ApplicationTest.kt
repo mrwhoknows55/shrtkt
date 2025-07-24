@@ -50,7 +50,7 @@ class ApplicationTest {
 
     fun ApplicationTestBuilder.setup() {
         application {
-            module()
+            module(true)
         }
         client = createClient {
             followRedirects = false

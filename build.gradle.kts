@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestLogEvent.*
+
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
@@ -15,9 +17,6 @@ kotlin {
     jvmToolchain(17)
 }
 
-repositories {
-    mavenCentral()
-}
 
 dependencies {
     implementation(libs.ktor.server.core)
@@ -36,3 +35,14 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }
+
+repositories {
+    mavenCentral()
+}
+
+tasks.test {
+    testLogging {
+        events = setOf(PASSED, FAILED, SKIPPED)
+    }
+}
+
