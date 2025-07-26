@@ -1,5 +1,5 @@
 ktor:
-  development: true
+  development: false
   application:
     modules:
       - xyz.avdt.ApplicationKt.module

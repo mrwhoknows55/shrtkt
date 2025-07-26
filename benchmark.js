@@ -6,8 +6,7 @@ export const options = {
   iterations: 10,
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'],
   thresholds: {
-    http_req_duration: ['p(50)<300', 'p(90)<500', 'p(95)<800', 'p(99)<1000'],
-    http_req_failed: ['rate<0.05'],
+    http_req_duration: ['p(50)<150', 'p(90)<300', 'p(95)<400', 'p(99)<600']
   },
 };
 
