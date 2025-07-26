@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  gradle-publish:
+    image: gradle:8.14.3-jdk17
+    volumes:
+      - .:/app
+    working_dir: /app
+    entrypoint: ["./gradlew"]
+    command: ["clean", "publishImageToLocalRegistry"]
+
+  shrtkt-api:
+    image: shrtkt-api
+    depends_on:
+      - gradle-publish
+    ports:
+      - "8080:8080"
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 4g

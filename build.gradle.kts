@@ -17,6 +17,30 @@ kotlin {
     jvmToolchain(17)
 }
 
+jib {
+    from {
+        image = "eclipse-temurin:17-jre"
+        val linux = "linux"
+        platforms {
+            platform {
+                architecture = "arm64"
+                os = linux
+            }
+            platform {
+                architecture = "amd64"
+                os = linux
+            }
+        }
+    }
+}
+
+ktor {
+    docker {
+        localImageName.set("shrtkt-api")
+        imageTag.set(version.toString())
+        jreVersion.set(JavaVersion.VERSION_17)
+    }
+}
 
 dependencies {
     implementation(libs.ktor.server.core)
