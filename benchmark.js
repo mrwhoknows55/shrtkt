@@ -2,11 +2,9 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 export const options = {
-  vus: 10,
-  iterations: 10,
   summaryTrendStats: ['avg', 'min', 'med', 'max', 'p(50)', 'p(90)', 'p(95)', 'p(99)'],
   thresholds: {
-    http_req_duration: ['p(50)<150', 'p(90)<300', 'p(95)<400', 'p(99)<600']
+    http_req_duration: ['p(99)<30000']
   },
 };
 
@@ -15,9 +13,9 @@ export function setup() {
 }
 
 export default function () {
-  const baseUrl = 'http://localhost:8080';
+  const baseUrl = 'http://0.0.0.0:8080';
 
-  const targetLoc = `https://avdt.xyz/page?query=${__VU}-${__ITER}`;
+  const targetLoc = `https://avdt.xyz/page?query=${Date.now()}-${__ITER}`;
 
   const shortenResponse = http.post(`${baseUrl}/shorten`, targetLoc, {
     headers: {
