@@ -11,8 +11,15 @@ import xyz.avdt.entities.UrlTable
 fun Routing.urlShortenerRoutes() {
 
     post("/shorten") {
-        val longUrl = URLBuilder(call.receiveText()).buildString()
+        val longUrl = URLBuilder(call.receiveText().trim()).buildString()
         val shortCode = transaction {
+            runCatching {
+                UrlTable.select(UrlTable.shortCode).where { UrlTable.redirectUrl eq longUrl }
+                    .single()[UrlTable.shortCode]
+
+            }.getOrNull()?.let {
+                return@transaction it
+            }
             runCatching {
                 UrlTable.insert {
                     it[redirectUrl] = longUrl
