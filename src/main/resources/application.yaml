@@ -4,7 +4,13 @@ ktor:
     modules:
       - xyz.avdt.ApplicationKt.module
   deployment:
-    port: 8080
+    port: "$PORT:8080"
+    database:
+      host: "$DB_HOST:0.0.0.0"
+      port: "$DB_PORT:5432"
+      name: "$DB_NAME:shrtkt"
+      user: "$DB_USER:postgres"
+      password: "$DB_PASSWORD:password"
     watch:
-    - classes
-    - resources
+      - classes
+      - resources

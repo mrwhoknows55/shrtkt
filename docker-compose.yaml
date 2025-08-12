@@ -1,6 +1,22 @@
 version: '3.8'
 
 services:
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: shrtkt
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
   gradle-publish:
     image: gradle:8.14.3-jdk17
     volumes:
@@ -13,10 +29,20 @@ services:
     image: shrtkt-api
     depends_on:
       - gradle-publish
+      - postgres
     ports:
       - "8080:8080"
+    environment:
+      DB_HOST: 0.0.0.0
+      DB_PORT: 5432
+      DB_NAME: shrtkt
+      DB_USER: postgres
+      DB_PASSWORD: password
     deploy:
       resources:
         limits:
           cpus: '2.0'
           memory: 4g
+
+volumes:
+  postgres_data:
