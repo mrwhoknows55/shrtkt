@@ -8,6 +8,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertNotEquals
 
 class ApplicationTest {
     val json = Json {
@@ -90,6 +91,67 @@ class ApplicationTest {
 
         val deleteRes2 = client.delete("/shorten/$shortCode")
         assertEquals(HttpStatusCode.NotFound, deleteRes2.status)
+    }
+
+
+    @Test
+    fun testInvalidUrl() = testApplication {
+        setup()
+        val shortRes = client.post("/shorten") {
+            setBody("avdt.xyz")
+        }
+        assertEquals(HttpStatusCode.BadRequest, shortRes.status)
+
+        val emptyRes = client.post("/shorten") {
+            setBody("")
+        }
+        assertEquals(HttpStatusCode.BadRequest, emptyRes.status)
+
+        val httpRes = client.post("/shorten") {
+            setBody("http://avdt.xyz")
+        }
+        assertNotEquals(HttpStatusCode.BadRequest, httpRes.status)
+
+        val httpsRes = client.post("/shorten") {
+            setBody("https://abc.xyz/test url")
+        }
+        assertNotEquals(HttpStatusCode.BadRequest, httpsRes.status)
+    }
+
+    @Test
+    fun testInvalidShortCode() = testApplication {
+        setup()
+        val redirectRes = client.get("/redirect")
+        assertEquals(HttpStatusCode.BadRequest, redirectRes.status)
+
+        val redirectRes2 = client.get("/redirect?code=random")
+        assertEquals(HttpStatusCode.BadRequest, redirectRes2.status)
+    }
+
+    @Test
+    fun testDifferentUrlsShouldGenerateDifferentCodes() = testApplication {
+        setup()
+        val shortRes1 = client.post("/shorten") {
+            setBody("https://avdt.xyz")
+        }
+        val shortCode1 = json.decodeFromString<JsonObject>(shortRes1.bodyAsText())["shortCode"]
+
+        val shortRes2 = client.post("/shorten") {
+            setBody("https://mrwhoknows.com")
+        }
+        val shortCode2 = json.decodeFromString<JsonObject>(shortRes2.bodyAsText())["shortCode"]
+
+        assertNotEquals(shortCode1, shortCode2)
+    }
+
+    @Test
+    fun testInvalidDeleteRequest() = testApplication {
+        setup()
+        val deleteRes = client.delete("/shorten")
+        assertEquals(HttpStatusCode.BadRequest, deleteRes.status)
+
+        val deleteRes2 = client.delete("/shorten/x")
+        assertEquals(HttpStatusCode.BadRequest, deleteRes2.status)
     }
 
     fun ApplicationTestBuilder.setup() {

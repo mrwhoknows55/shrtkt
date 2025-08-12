@@ -14,7 +14,11 @@ fun Routing.urlShortenerRoutes() {
 
     route("/shorten") {
         post {
-            val longUrl = URLBuilder(call.receiveText().trim()).buildString()
+            val encodedUrl = runCatching { call.receiveText().trim().encodeURLPath() }.getOrElse { "" }
+            val longUrl = parseUrl(encodedUrl)?.toString() ?: return@post call.respond(
+                status = HttpStatusCode.BadRequest,
+                "invalid url"
+            )
             val shortCode = transaction {
                 runCatching {
                     UrlTable.select(UrlTable.shortCode).where { UrlTable.redirectUrl eq longUrl }
@@ -36,8 +40,13 @@ fun Routing.urlShortenerRoutes() {
             return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
         }
 
+        delete {
+            call.respondText(
+                "wrong request format for short code", status = HttpStatusCode.BadRequest
+            )
+        }
+
         delete("/{shortCode}") {
-            println("DELETE shortCode path -> ${call.request.pathVariables}")
             val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@delete call.respondText(
                 "wrong request format for short code", status = HttpStatusCode.BadRequest
             )
