@@ -48,6 +48,28 @@ class ApplicationTest {
 
     }
 
+    @Test
+    fun testSameUrlShouldReturnSameShortCode() = testApplication {
+        setup()
+        val targetLoc = "https://avdt.xyz"
+
+        val shortRes = client.post("/shorten") {
+            setBody(targetLoc)
+        }
+
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val originalShortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+        assert(originalShortCode != null)
+
+        val duplicateRes = client.post("/shorten") {
+            setBody(targetLoc)
+        }
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val duplicateShortCode = json.decodeFromString<JsonObject>(duplicateRes.bodyAsText())["shortCode"]
+        assert(originalShortCode == duplicateShortCode)
+
+    }
+
     fun ApplicationTestBuilder.setup() {
         application {
             module(true)
