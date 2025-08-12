@@ -70,6 +70,13 @@ class ApplicationTest {
 
     }
 
+    @Test
+    fun testNotFoundShortCode() = testApplication {
+        setup()
+        val redirectRes = client.get("/redirect?code=-1")
+        assertEquals(HttpStatusCode.NotFound, redirectRes.status)
+    }
+
     fun ApplicationTestBuilder.setup() {
         application {
             module(true)
