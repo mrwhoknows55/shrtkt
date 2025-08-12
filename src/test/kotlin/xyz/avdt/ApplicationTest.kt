@@ -77,6 +77,21 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.NotFound, redirectRes.status)
     }
 
+    @Test
+    fun testDeleteShortCode() = testApplication {
+        setup()
+        val shortRes = client.post("/shorten") {
+            setBody("https://avdt.xyz")
+        }
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+
+        val deleteRes = client.delete("/shorten/$shortCode")
+        assertEquals(HttpStatusCode.NoContent, deleteRes.status)
+
+        val deleteRes2 = client.delete("/shorten/$shortCode")
+        assertEquals(HttpStatusCode.NotFound, deleteRes2.status)
+    }
+
     fun ApplicationTestBuilder.setup() {
         application {
             module(true)
