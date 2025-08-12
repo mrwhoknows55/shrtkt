@@ -4,33 +4,59 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
 import xyz.avdt.entities.UrlTable
 
 fun Routing.urlShortenerRoutes() {
 
-    post("/shorten") {
-        val longUrl = URLBuilder(call.receiveText().trim()).buildString()
-        val shortCode = transaction {
-            runCatching {
-                UrlTable.select(UrlTable.shortCode).where { UrlTable.redirectUrl eq longUrl }
-                    .single()[UrlTable.shortCode]
+    route("/shorten") {
+        post {
+            val longUrl = URLBuilder(call.receiveText().trim()).buildString()
+            val shortCode = transaction {
+                runCatching {
+                    UrlTable.select(UrlTable.shortCode).where { UrlTable.redirectUrl eq longUrl }
+                        .single()[UrlTable.shortCode]
 
-            }.getOrNull()?.let {
-                return@transaction it
+                }.getOrNull()?.let {
+                    return@transaction it
+                }
+                runCatching {
+                    UrlTable.insert {
+                        it[redirectUrl] = longUrl
+                    } get UrlTable.shortCode
+                }.getOrNull()
             }
-            runCatching {
-                UrlTable.insert {
-                    it[redirectUrl] = longUrl
-                } get UrlTable.shortCode
-            }.getOrNull()
+            shortCode?.let {
+                println("added $longUrl on $shortCode code")
+                return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to shortCode))
+            }
+            return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
         }
-        shortCode?.let {
-            println("added $longUrl on $shortCode code")
-            return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to shortCode))
+
+        delete("/{shortCode}") {
+            println("DELETE shortCode path -> ${call.request.pathVariables}")
+            val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@delete call.respondText(
+                "wrong request format for short code", status = HttpStatusCode.BadRequest
+            )
+
+            val result = transaction {
+                runCatching {
+                    UrlTable.deleteWhere { UrlTable.shortCode eq shortCode }
+                }.getOrElse { -1 }
+            }
+
+            if (result > 0) {
+                println("shortCode: $shortCode deleted")
+                call.respondText("short code deleted successfully", status = HttpStatusCode.NoContent)
+            } else {
+                println("shortCode: $shortCode not found")
+                call.respondText("short code not found", status = HttpStatusCode.NotFound)
+            }
+
         }
-        return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
     }
 
     get("/redirect") {
