@@ -8,6 +8,7 @@ import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.sql.deleteWhere
 import org.jetbrains.exposed.sql.insert
 import org.jetbrains.exposed.sql.transactions.transaction
+import org.jetbrains.exposed.sql.update
 import xyz.avdt.entities.UrlTable
 
 fun Routing.urlShortenerRoutes() {
@@ -16,8 +17,7 @@ fun Routing.urlShortenerRoutes() {
         post {
             val encodedUrl = runCatching { call.receiveText().trim().encodeURLPath() }.getOrElse { "" }
             val longUrl = parseUrl(encodedUrl)?.toString() ?: return@post call.respond(
-                status = HttpStatusCode.BadRequest,
-                "invalid url"
+                status = HttpStatusCode.BadRequest, "invalid url"
             )
             val shortCode = transaction {
                 runCatching {
@@ -38,6 +38,45 @@ fun Routing.urlShortenerRoutes() {
                 return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to shortCode))
             }
             return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
+        }
+
+        put {
+            call.respondText(
+                "wrong request format for short code", status = HttpStatusCode.BadRequest
+            )
+        }
+
+        put("{shortCode}") {
+            val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@put call.respondText(
+                "wrong request format for short code", status = HttpStatusCode.BadRequest
+            )
+            val encodedUrl = runCatching { call.receiveText().trim().encodeURLPath() }.getOrElse { "" }
+            val urlToUpdate = parseUrl(encodedUrl)?.toString() ?: return@put call.respond(
+                status = HttpStatusCode.BadRequest, "invalid url"
+            )
+
+            val doesNewUrlAlreadyExist = transaction {
+                UrlTable.select(UrlTable.redirectUrl).where { UrlTable.redirectUrl eq urlToUpdate }.count() > 0L
+            }
+            if (doesNewUrlAlreadyExist) {
+                return@put call.respond(
+                    status = HttpStatusCode.BadRequest, "this url is already shortened"
+                )
+            }
+
+            val count = transaction {
+                UrlTable.update({ UrlTable.shortCode eq shortCode }) {
+                    it[redirectUrl] = urlToUpdate
+                }
+            }
+
+            if (count > 0) {
+                println("updated url $urlToUpdate on shortCode: $shortCode")
+                return@put call.respond(HttpStatusCode.Accepted, mapOf("shortCode" to shortCode))
+            } else {
+                return@put call.respondText("URL for the short code doesn't exist", status = HttpStatusCode.NotFound)
+            }
+
         }
 
         delete {

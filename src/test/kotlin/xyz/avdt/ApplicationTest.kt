@@ -6,6 +6,7 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -152,6 +153,37 @@ class ApplicationTest {
 
         val deleteRes2 = client.delete("/shorten/x")
         assertEquals(HttpStatusCode.BadRequest, deleteRes2.status)
+    }
+
+    @Test
+    fun testPutRequest() = testApplication {
+        setup()
+        val targetLoc1 = "https://avdt.xyz"
+        val shortRes = client.post("/shorten") {
+            setBody(targetLoc1)
+        }
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+
+        val redirectRes = client.get("/redirect?code=$shortCode")
+        val resultLocation = redirectRes.headers["Location"]
+        assertEquals(targetLoc1, resultLocation)
+
+        val targetLoc2 = "https://mrwhoknows.com"
+        val result = client.put("/shorten/$shortCode") {
+            setBody(targetLoc2)
+        }
+        assertEquals(HttpStatusCode.BadRequest, result.status)
+
+        val targetLoc3 = "https://random.com/${Random.nextInt(1, 100)}"
+        client.put("/shorten/$shortCode") {
+            setBody(targetLoc3)
+        }
+        val redirectAfterPutRes = client.get("/redirect?code=$shortCode")
+        val resultLocation2 = redirectAfterPutRes.headers["Location"]
+        assertEquals(targetLoc3, resultLocation2)
+        client.put("/shorten/$shortCode") {
+            setBody(targetLoc1)
+        }
     }
 
     fun ApplicationTestBuilder.setup() {
