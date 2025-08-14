@@ -4,13 +4,19 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.jetbrains.exposed.sql.SqlExpressionBuilder.eq
-import org.jetbrains.exposed.sql.deleteWhere
-import org.jetbrains.exposed.sql.insert
-import org.jetbrains.exposed.sql.transactions.transaction
-import org.jetbrains.exposed.sql.update
+import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
+import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.jdbc.insert
+import org.jetbrains.exposed.v1.jdbc.select
+import org.jetbrains.exposed.v1.jdbc.selectAll
+import org.jetbrains.exposed.v1.jdbc.transactions.transaction
+import org.jetbrains.exposed.v1.jdbc.update
 import xyz.avdt.entities.UrlTable
+import xyz.avdt.utils.currentLocalDateTime
+import kotlin.time.ExperimentalTime
 
+@OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
 
     route("/shorten") {
@@ -119,7 +125,16 @@ fun Routing.urlShortenerRoutes() {
             }.getOrNull()
         }
         result?.let {
-            println("redirecting $code to $it")
+            runCatching {
+                transaction {
+                    UrlTable.update({
+                        UrlTable.shortCode eq code
+                    }) {
+                        it[UrlTable.visitCount] = UrlTable.visitCount + 1
+                        it[UrlTable.lastAccessedAt] = currentLocalDateTime()
+                    }
+                }
+            }
             return@get call.respondRedirect(it)
         }
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)

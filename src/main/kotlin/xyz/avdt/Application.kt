@@ -12,9 +12,9 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module(isTesting: Boolean = false) {
-    if (!isTesting) {
-        configureMonitoring()
-    }
+//    if (!isTesting) {
+//        configureMonitoring()
+//    }
     configureDatabases()
     configureSerialization()
 
