@@ -6,7 +6,6 @@ import io.ktor.http.*
 import io.ktor.server.testing.*
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -27,7 +26,6 @@ class ApplicationTest {
         val statusRes = client.get("/status")
         assertEquals(HttpStatusCode.OK, statusRes.status)
         assertEquals("OK", statusRes.bodyAsText())
-
     }
 
     @Test
@@ -47,11 +45,10 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.Found, redirectRes.status)
         val resultLocation = redirectRes.headers["Location"]
         assertEquals(targetLoc, resultLocation)
-
     }
 
     @Test
-    fun testSameUrlShouldReturnSameShortCode() = testApplication {
+    fun testSameUrlShouldReturnDifferentShortCodes() = testApplication {
         setup()
         val targetLoc = "https://avdt.xyz"
 
@@ -66,10 +63,51 @@ class ApplicationTest {
         val duplicateRes = client.post("/shorten") {
             setBody(targetLoc)
         }
-        assertEquals(HttpStatusCode.Created, shortRes.status)
+        assertEquals(HttpStatusCode.Created, duplicateRes.status)
         val duplicateShortCode = json.decodeFromString<JsonObject>(duplicateRes.bodyAsText())["shortCode"]
-        assert(originalShortCode == duplicateShortCode)
+        assertNotEquals(originalShortCode, duplicateShortCode)
+    }
 
+    @Test
+    fun testTopUrlsEndpoint() = testApplication {
+        setup()
+
+        val targetLoc = "https://avdt.xyz"
+
+        client.post("/shorten") {
+            setBody(targetLoc)
+        }
+
+        client.post("/shorten") {
+            setBody(targetLoc)
+        }
+
+        client.post("/shorten") {
+            setBody(targetLoc)
+        }
+
+        val differentUrl = "https://mrwhoknows.com?q=${System.currentTimeMillis()}"
+        client.post("/shorten") {
+            setBody(differentUrl)
+        }
+
+        val topUrlsRes = client.get("/stats/top-urls")
+        assertEquals(HttpStatusCode.OK, topUrlsRes.status)
+
+        val responseBody = topUrlsRes.bodyAsText()
+        assert(responseBody.contains(targetLoc))
+        assert(responseBody.contains(differentUrl))
+    }
+
+    @Test
+    fun testTopUrlsRedirect() = testApplication {
+        setup()
+
+        val topUrlsRes = client.get("/top-urls")
+        assertEquals(HttpStatusCode.Found, topUrlsRes.status)
+
+        val redirectRes = client.get("/stats/top-urls")
+        assertEquals(HttpStatusCode.OK, redirectRes.status)
     }
 
     @Test
@@ -93,7 +131,6 @@ class ApplicationTest {
         val deleteRes2 = client.delete("/shorten/$shortCode")
         assertEquals(HttpStatusCode.NotFound, deleteRes2.status)
     }
-
 
     @Test
     fun testInvalidUrl() = testApplication {
@@ -172,15 +209,12 @@ class ApplicationTest {
         val result = client.put("/shorten/$shortCode") {
             setBody(targetLoc2)
         }
-        assertEquals(HttpStatusCode.BadRequest, result.status)
+        assertEquals(HttpStatusCode.Accepted, result.status)
 
-        val targetLoc3 = "https://random.com/${Random.nextInt(1, 100)}"
-        client.put("/shorten/$shortCode") {
-            setBody(targetLoc3)
-        }
         val redirectAfterPutRes = client.get("/redirect?code=$shortCode")
         val resultLocation2 = redirectAfterPutRes.headers["Location"]
-        assertEquals(targetLoc3, resultLocation2)
+        assertEquals(targetLoc2, resultLocation2)
+
         client.put("/shorten/$shortCode") {
             setBody(targetLoc1)
         }

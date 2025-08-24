@@ -11,4 +11,7 @@ fun Routing.commonRoutes() {
     get("/status") {
         call.respondText("OK", status = HttpStatusCode.OK)
     }
+    get("/top-urls") {
+        call.respondRedirect("/stats/top-urls")
+    }
 }

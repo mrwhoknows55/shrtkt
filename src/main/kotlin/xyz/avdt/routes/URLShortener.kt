@@ -20,24 +20,18 @@ fun Routing.urlShortenerRoutes() {
 
     route("/shorten") {
         post {
-            val encodedUrl = runCatching { call.receiveText().trim().encodeURLPath() }.getOrElse { "" }
+            val encodedUrl = runCatching { call.receiveText().trim() }.getOrElse { "" }
             val longUrl = parseUrl(encodedUrl)?.toString() ?: return@post call.respond(
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
             val shortCode = transaction {
-                runCatching {
-                    UrlTable.select(UrlTable.shortCode).where { UrlTable.redirectUrl eq longUrl }
-                        .single()[UrlTable.shortCode]
-
-                }.getOrNull()?.let {
-                    return@transaction it
-                }
                 runCatching {
                     UrlTable.insert {
                         it[redirectUrl] = longUrl
                     } get UrlTable.shortCode
                 }.getOrNull()
             }
+
             shortCode?.let {
                 println("added $longUrl on $shortCode code")
                 return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to shortCode))
@@ -55,19 +49,10 @@ fun Routing.urlShortenerRoutes() {
             val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@put call.respondText(
                 "wrong request format for short code", status = HttpStatusCode.BadRequest
             )
-            val encodedUrl = runCatching { call.receiveText().trim().encodeURLPath() }.getOrElse { "" }
+            val encodedUrl = runCatching { call.receiveText().trim() }.getOrElse { "" }
             val urlToUpdate = parseUrl(encodedUrl)?.toString() ?: return@put call.respond(
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
-
-            val doesNewUrlAlreadyExist = transaction {
-                UrlTable.select(UrlTable.redirectUrl).where { UrlTable.redirectUrl eq urlToUpdate }.count() > 0L
-            }
-            if (doesNewUrlAlreadyExist) {
-                return@put call.respond(
-                    status = HttpStatusCode.BadRequest, "this url is already shortened"
-                )
-            }
 
             val count = transaction {
                 UrlTable.update({ UrlTable.shortCode eq shortCode }) {
@@ -102,7 +87,7 @@ fun Routing.urlShortenerRoutes() {
             }
 
             if (result > 0) {
-                println("shortCode: $shortCode deleted")
+                println("shortCode: $shortCode deleted successfully")
                 call.respondText("short code deleted successfully", status = HttpStatusCode.NoContent)
             } else {
                 println("shortCode: $shortCode not found")
@@ -139,4 +124,25 @@ fun Routing.urlShortenerRoutes() {
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)
     }
 
+    get("/stats/top-urls") {
+        println("Fetching top 10 URLs by shortening frequency")
+
+        val topUrls = transaction {
+            val urlCounts = mutableMapOf<String, Long>()
+
+            UrlTable.select(UrlTable.redirectUrl).forEach { row ->
+                val url = row[UrlTable.redirectUrl]
+                urlCounts[url] = urlCounts.getOrDefault(url, 0L) + 1L
+            }
+
+            urlCounts.entries.sortedByDescending { it.value }.take(10).map { (url, count) ->
+                mapOf(
+                    "url" to url, "shortenCount" to count.toString()
+                )
+            }
+        }
+
+        println("Found ${topUrls.size} top URLs")
+        call.respond(HttpStatusCode.OK, mapOf("topUrls" to topUrls))
+    }
 }

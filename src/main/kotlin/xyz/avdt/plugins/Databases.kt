@@ -24,10 +24,24 @@ fun Application.configureDatabases() {
         val statements = MigrationUtils.statementsRequiredForDatabaseMigration(
             UrlTable
         )
-        statements.forEach {
-            println("executing migration statement: $it")
-            exec(it)
+        transaction {
+            runCatching {
+                exec("ALTER TABLE urls DROP CONSTRAINT IF EXISTS urls_redirect_url_unique")
+                exec("DROP INDEX IF EXISTS urls_redirect_url_unique")
+                println("Dropped unique index on redirect_url")
+            }.onFailure {
+                it.printStackTrace()
+            }
+            runCatching {
+                statements.forEach {
+                    println("executing migration statement: $it")
+                    exec(it)
+                }
+            }.onFailure {
+                it.printStackTrace()
+            }
         }
+
         val count = UrlTable.selectAll().count()
         println("UrlTable count -> $count")
     }
