@@ -1,6 +1,7 @@
 package xyz.avdt
 
 import io.ktor.client.request.*
+import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
@@ -15,6 +16,13 @@ class ApplicationTest {
         isLenient = true
         ignoreUnknownKeys = true
     }
+    val apiKey = "1234"
+    val userName = "test"
+    val email = "test"
+    fun HttpRequestBuilder.addXApiKey(xApiKey: String = apiKey) {
+        header("x-api-key", xApiKey)
+    }
+
 
     @Test
     fun testRoot() = testApplication {
@@ -35,6 +43,7 @@ class ApplicationTest {
 
         val shortRes = client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
 
         assertEquals(HttpStatusCode.Created, shortRes.status)
@@ -54,6 +63,7 @@ class ApplicationTest {
 
         val shortRes = client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
 
         assertEquals(HttpStatusCode.Created, shortRes.status)
@@ -62,6 +72,7 @@ class ApplicationTest {
 
         val duplicateRes = client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
         assertEquals(HttpStatusCode.Created, duplicateRes.status)
         val duplicateShortCode = json.decodeFromString<JsonObject>(duplicateRes.bodyAsText())["shortCode"]
@@ -76,19 +87,23 @@ class ApplicationTest {
 
         client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
 
         client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
 
         client.post("/shorten") {
             setBody(targetLoc)
+            addXApiKey()
         }
 
-        val differentUrl = "https://mrwhoknows.com?q=${System.currentTimeMillis()}"
+        val differentUrl = "https://mrwhoknows.com"
         client.post("/shorten") {
             setBody(differentUrl)
+            addXApiKey()
         }
 
         val topUrlsRes = client.get("/stats/top-urls")
@@ -122,14 +137,17 @@ class ApplicationTest {
         setup()
         val shortRes = client.post("/shorten") {
             setBody("https://avdt.xyz")
+            addXApiKey()
         }
         val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
-
-        val deleteRes = client.delete("/shorten/$shortCode")
+        val deleteRes = client.delete("/shorten/$shortCode") { addXApiKey() }
         assertEquals(HttpStatusCode.NoContent, deleteRes.status)
 
-        val deleteRes2 = client.delete("/shorten/$shortCode")
+        val deleteRes2 = client.delete("/shorten/$shortCode") { addXApiKey() }
         assertEquals(HttpStatusCode.NotFound, deleteRes2.status)
+
+        val deleteRes3 = client.delete("/shorten/$shortCode") { addXApiKey("") }
+        assertEquals(HttpStatusCode.Unauthorized, deleteRes3.status)
     }
 
     @Test
@@ -137,21 +155,25 @@ class ApplicationTest {
         setup()
         val shortRes = client.post("/shorten") {
             setBody("avdt.xyz")
+            addXApiKey()
         }
         assertEquals(HttpStatusCode.BadRequest, shortRes.status)
 
         val emptyRes = client.post("/shorten") {
             setBody("")
+            addXApiKey()
         }
         assertEquals(HttpStatusCode.BadRequest, emptyRes.status)
 
         val httpRes = client.post("/shorten") {
             setBody("http://avdt.xyz")
+            addXApiKey()
         }
         assertNotEquals(HttpStatusCode.BadRequest, httpRes.status)
 
         val httpsRes = client.post("/shorten") {
             setBody("https://abc.xyz/test url")
+            addXApiKey()
         }
         assertNotEquals(HttpStatusCode.BadRequest, httpsRes.status)
     }
@@ -171,11 +193,13 @@ class ApplicationTest {
         setup()
         val shortRes1 = client.post("/shorten") {
             setBody("https://avdt.xyz")
+            addXApiKey()
         }
         val shortCode1 = json.decodeFromString<JsonObject>(shortRes1.bodyAsText())["shortCode"]
 
         val shortRes2 = client.post("/shorten") {
             setBody("https://mrwhoknows.com")
+            addXApiKey()
         }
         val shortCode2 = json.decodeFromString<JsonObject>(shortRes2.bodyAsText())["shortCode"]
 
@@ -185,10 +209,14 @@ class ApplicationTest {
     @Test
     fun testInvalidDeleteRequest() = testApplication {
         setup()
-        val deleteRes = client.delete("/shorten")
+        val deleteRes = client.delete("/shorten") {
+            addXApiKey()
+        }
         assertEquals(HttpStatusCode.BadRequest, deleteRes.status)
 
-        val deleteRes2 = client.delete("/shorten/x")
+        val deleteRes2 = client.delete("/shorten/x") {
+            addXApiKey()
+        }
         assertEquals(HttpStatusCode.BadRequest, deleteRes2.status)
     }
 
@@ -198,6 +226,7 @@ class ApplicationTest {
         val targetLoc1 = "https://avdt.xyz"
         val shortRes = client.post("/shorten") {
             setBody(targetLoc1)
+            addXApiKey()
         }
         val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
 
@@ -208,8 +237,12 @@ class ApplicationTest {
         val targetLoc2 = "https://mrwhoknows.com"
         val result = client.put("/shorten/$shortCode") {
             setBody(targetLoc2)
+            addXApiKey()
         }
         assertEquals(HttpStatusCode.Accepted, result.status)
+
+        val withoutApiKey = client.put("/shorten/$shortCode") { setBody(targetLoc2) }
+        assertEquals(HttpStatusCode.Unauthorized, withoutApiKey.status)
 
         val redirectAfterPutRes = client.get("/redirect?code=$shortCode")
         val resultLocation2 = redirectAfterPutRes.headers["Location"]
@@ -217,6 +250,7 @@ class ApplicationTest {
 
         client.put("/shorten/$shortCode") {
             setBody(targetLoc1)
+            addXApiKey()
         }
     }
 
@@ -226,6 +260,20 @@ class ApplicationTest {
         }
         client = createClient {
             followRedirects = false
+        }
+    }
+
+
+    init {
+        testApplication {
+            setup()
+            client.post("/user") {
+                setBody(FormDataContent(Parameters.build {
+                    append("name", userName)
+                    append("email", email)
+                }))
+                addXApiKey()
+            }
         }
     }
 }
