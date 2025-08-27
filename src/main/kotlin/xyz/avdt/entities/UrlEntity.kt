@@ -11,6 +11,7 @@ object UrlTable : Table("urls") {
     val createdAt = datetime("created_at").clientDefault { currentLocalDateTime() }
     val lastAccessedAt = datetime("last_accessed_at").nullable().default(null).clientDefault { currentLocalDateTime() }
     val userId = reference("user_id", UserTable.id).nullable()  .default(null)
+    val deletedAt = datetime("deleted_at").nullable().default(null)
 
     override val primaryKey = PrimaryKey(shortCode)
 }

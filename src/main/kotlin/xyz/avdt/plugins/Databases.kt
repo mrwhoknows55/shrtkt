@@ -39,6 +39,19 @@ fun Application.configureDatabases() {
             }.onFailure {
                 it.printStackTrace()
             }
+
+            runCatching {
+                val rows = UserTable.selectAll().count()
+                println("Existing users: $rows")
+                if (rows == 0L) {
+                    println("Seeding sample users")
+                    exec("INSERT INTO users (email, name, api_key, created_at) VALUES ('alice@email.com', 'Alice', 'sk_test_alice', NOW()) ON CONFLICT DO NOTHING")
+                    exec("INSERT INTO users (email, name, api_key, created_at) VALUES ('bob@email.com', 'Bob', 'sk_test_bob', NOW()) ON CONFLICT DO NOTHING")
+                    println("added sample users with test API keys")
+                }
+            }.onFailure {
+                println(it.message.orEmpty())
+            }
         }
 
         val count = UrlTable.selectAll().count()

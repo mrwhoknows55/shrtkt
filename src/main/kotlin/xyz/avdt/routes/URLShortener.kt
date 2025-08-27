@@ -4,14 +4,17 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.eq
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
-import org.jetbrains.exposed.v1.jdbc.deleteWhere
+import org.jetbrains.exposed.v1.core.count
+import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import xyz.avdt.entities.UrlTable
+import xyz.avdt.entities.UrlTable.deletedAt
+import xyz.avdt.entities.UrlTable.redirectUrl
+import xyz.avdt.entities.UrlTable.shortCode
 import xyz.avdt.entities.UserTable
 import xyz.avdt.utils.currentLocalDateTime
 import kotlin.time.ExperimentalTime
@@ -28,7 +31,7 @@ fun Routing.urlShortenerRoutes() {
         }
         val userId = transaction {
             runCatching {
-                UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }.single()[UserTable.id]
+                UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }.limit(1).single()[UserTable.id]
             }.onFailure {
                 it.printStackTrace()
 
@@ -53,9 +56,10 @@ fun Routing.urlShortenerRoutes() {
             val shortCode = transaction {
                 runCatching {
                     UrlTable.insert {
-                        it[UrlTable.redirectUrl] = longUrl
+                        it[redirectUrl] = longUrl
                         it[UrlTable.userId] = userId
-                    } get UrlTable.shortCode
+                        it[deletedAt] = null
+                    } get shortCode
                 }.getOrNull()
             }
 
@@ -91,6 +95,7 @@ fun Routing.urlShortenerRoutes() {
                     UrlTable.userId eq userId
                 }) {
                     it[redirectUrl] = urlToUpdate
+                    it[deletedAt] = null
                 }
             }
 
@@ -123,9 +128,12 @@ fun Routing.urlShortenerRoutes() {
 
             val result = transaction {
                 runCatching {
-                    UrlTable.deleteWhere {
+                    UrlTable.update({
                         UrlTable.shortCode eq shortCode
                         UrlTable.userId eq userId
+                        deletedAt.isNull()
+                    }) {
+                        it[deletedAt] = currentLocalDateTime()
                     }
                 }.getOrElse { -1 }
             }
@@ -147,23 +155,30 @@ fun Routing.urlShortenerRoutes() {
         )
         val result = transaction {
             runCatching {
-                val longUrl = UrlTable.select(UrlTable.redirectUrl).where { UrlTable.shortCode eq code }
-                    .single()[UrlTable.redirectUrl]
+                val longUrl = UrlTable.select(redirectUrl).where {
+                    shortCode eq code
+                }.andWhere {
+                    deletedAt.isNull()
+                }.single()[redirectUrl]
                 return@transaction longUrl
+            }.onFailure {
+                println("${it.message}")
             }.getOrNull()
         }
-        result?.let {
+        result?.let { url ->
             runCatching {
                 transaction {
-                    UrlTable.update({
-                        UrlTable.shortCode eq code
+                    UrlTable.update(where = {
+                        shortCode eq code
+                        deletedAt.isNull()
                     }) {
-                        it[UrlTable.visitCount] = UrlTable.visitCount + 1
-                        it[UrlTable.lastAccessedAt] = currentLocalDateTime()
+                        it[visitCount] = visitCount + 1
+                        it[lastAccessedAt] = currentLocalDateTime()
                     }
                 }
             }
-            return@get call.respondRedirect(it)
+            println("redirecting $code to its target destination")
+            return@get call.respondRedirect(url)
         }
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)
     }
@@ -172,14 +187,15 @@ fun Routing.urlShortenerRoutes() {
         println("Fetching top 10 URLs by shortening frequency")
 
         val topUrls = transaction {
-            val urlCounts = mutableMapOf<String, Long>()
+            val urlCounts =
+                UrlTable.select(redirectUrl, redirectUrl.count()).where { deletedAt eq null }.groupBy(redirectUrl)
+                    .limit(10).map { row ->
+                        val url = row[redirectUrl]
+                        val count = row[redirectUrl.count()]
+                        url to count
+                    }
 
-            UrlTable.select(UrlTable.redirectUrl).forEach { row ->
-                val url = row[UrlTable.redirectUrl]
-                urlCounts[url] = urlCounts.getOrDefault(url, 0L) + 1L
-            }
-
-            urlCounts.entries.sortedByDescending { it.value }.take(10).map { (url, count) ->
+            urlCounts.sortedByDescending { it.second }.map { (url, count) ->
                 mapOf(
                     "url" to url, "shortenCount" to count.toString()
                 )

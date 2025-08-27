@@ -38,6 +38,12 @@ ApplicationTest > testRoot PASSED
 ApplicationTest > testShortenAndRedirect PASSED
 ```
 
+## Sample API Keys
+Use the following test API keys via the `x-api-key` header:
+
+- Alice: `sk_test_alice`
+- Bob: `sk_test_bob`
+
 ## API Performance
 
 ### Test Configuration
