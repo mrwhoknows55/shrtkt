@@ -1,0 +1,23 @@
+meta {
+  name: shorten
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{base_url}}/shorten
+  body: text
+  auth: inherit
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+body:text {
+  http://example.com/
+}
+
+settings {
+  encodeUrl: false
+}

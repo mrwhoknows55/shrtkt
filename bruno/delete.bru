@@ -1,0 +1,23 @@
+meta {
+  name: delete
+  type: http
+  seq: 6
+}
+
+delete {
+  url: {{base_url}}/shorten/:code
+  body: none
+  auth: inherit
+}
+
+params:path {
+  code: 97
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+settings {
+  encodeUrl: false
+}

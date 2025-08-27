@@ -1,0 +1,19 @@
+meta {
+  name: redirect
+  type: http
+  seq: 4
+}
+
+get {
+  url: {{base_url}}/redirect?code=97
+  body: none
+  auth: inherit
+}
+
+params:query {
+  code: 97
+}
+
+settings {
+  encodeUrl: false
+}

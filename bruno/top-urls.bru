@@ -1,0 +1,15 @@
+meta {
+  name: top-urls
+  type: http
+  seq: 7
+}
+
+get {
+  url: {{base_url}}/stats/top-urls
+  body: none
+  auth: inherit
+}
+
+settings {
+  encodeUrl: false
+}

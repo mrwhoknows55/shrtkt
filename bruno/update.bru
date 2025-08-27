@@ -1,0 +1,28 @@
+meta {
+  name: update
+  type: http
+  seq: 5
+}
+
+put {
+  url: {{base_url}}/shorten/:shortCode
+  body: text
+  auth: inherit
+}
+
+params:path {
+  shortCode: 97
+}
+
+headers {
+  x-api-key: {{api_key}}
+  Content-Type: text/plain
+}
+
+body:text {
+  https://example.org
+}
+
+settings {
+  encodeUrl: false
+}

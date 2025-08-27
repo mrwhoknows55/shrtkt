@@ -1,0 +1,24 @@
+meta {
+  name: create-user
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{base_url}}/user
+  body: formUrlEncoded
+  auth: inherit
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+body:form-urlencoded {
+  name: Alice
+  email: alice@example.com
+}
+
+settings {
+  encodeUrl: false
+}
