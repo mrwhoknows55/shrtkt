@@ -4,8 +4,10 @@ import io.ktor.http.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.v1.core.count
+import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
@@ -13,6 +15,7 @@ import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
 import xyz.avdt.entities.UrlTable
 import xyz.avdt.entities.UrlTable.deletedAt
+import xyz.avdt.entities.UrlTable.expiredAt
 import xyz.avdt.entities.UrlTable.redirectUrl
 import xyz.avdt.entities.UrlTable.shortCode
 import xyz.avdt.entities.UserTable
@@ -49,23 +52,37 @@ fun Routing.urlShortenerRoutes() {
                 return@post error
             }
             val userId = id!!
-            val encodedUrl = runCatching { call.receiveText().trim() }.getOrElse { "" }
+            val params = call.receiveParameters()
+            val encodedUrl = params["url"].orEmpty().trim()
             val longUrl = parseUrl(encodedUrl)?.toString() ?: return@post call.respond(
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
+            val expiredAtStr = params["expiredAt"].orEmpty()
+            val expiredAtTime = runCatching {
+                if (expiredAtStr.isNotBlank()) {
+                    LocalDateTime.parse(expiredAtStr)
+                } else {
+                    null
+                }
+            }.onFailure {
+                return@post call.respondText(
+                    "wrong request format for expiredAt param", status = HttpStatusCode.BadRequest
+                )
+            }.getOrNull()
             val shortCode = transaction {
                 runCatching {
                     UrlTable.insert {
                         it[redirectUrl] = longUrl
                         it[UrlTable.userId] = userId
                         it[deletedAt] = null
+                        it[expiredAt] = expiredAtTime
                     } get shortCode
                 }.getOrNull()
             }
 
             shortCode?.let {
-                println("added $longUrl on $shortCode code")
-                return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to shortCode))
+                println("added $longUrl on $it code")
+                return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to it))
             }
             return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
         }
@@ -82,10 +99,24 @@ fun Routing.urlShortenerRoutes() {
                 return@put error
             }
             val userId = id!!
+            val params = call.receiveParameters()
             val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@put call.respondText(
                 "wrong request format for short code", status = HttpStatusCode.BadRequest
             )
-            val encodedUrl = runCatching { call.receiveText().trim() }.getOrElse { "" }
+            val encodedUrl = params["url"].orEmpty().trim()
+            val expiredAtStr = params["expiredAt"].orEmpty()
+            val expiredAtTime = runCatching {
+                if (expiredAtStr.isNotBlank()) {
+                    LocalDateTime.parse(expiredAtStr)
+                } else {
+                    null
+                }
+            }.onFailure {
+                return@put call.respondText(
+                    "wrong request format for expiredAt param", status = HttpStatusCode.BadRequest
+                )
+            }.getOrNull()
+
             val urlToUpdate = parseUrl(encodedUrl)?.toString() ?: return@put call.respond(
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
@@ -96,6 +127,7 @@ fun Routing.urlShortenerRoutes() {
                 }) {
                     it[redirectUrl] = urlToUpdate
                     it[deletedAt] = null
+                    it[expiredAt] = expiredAtTime
                 }
             }
 
@@ -159,6 +191,8 @@ fun Routing.urlShortenerRoutes() {
                     shortCode eq code
                 }.andWhere {
                     deletedAt.isNull()
+                }.andWhere {
+                    expiredAt.isNull() or (expiredAt greater currentLocalDateTime())
                 }.single()[redirectUrl]
                 return@transaction longUrl
             }.onFailure {

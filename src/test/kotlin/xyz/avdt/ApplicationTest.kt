@@ -5,11 +5,18 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import kotlinx.datetime.LocalDateTime
+import kotlinx.datetime.TimeZone.Companion.currentSystemDefault
+import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import xyz.avdt.utils.currentLocalDateTime
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
+import kotlin.time.Clock
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.ExperimentalTime
 
 class ApplicationTest {
     val json = Json {
@@ -21,6 +28,15 @@ class ApplicationTest {
     val email = "test"
     fun HttpRequestBuilder.addXApiKey(xApiKey: String = apiKey) {
         header("x-api-key", xApiKey)
+    }
+
+    fun HttpRequestBuilder.setBodyX(url: String, expiredAt: LocalDateTime? = null) {
+        setBody(FormDataContent(Parameters.build {
+            append("url", url)
+            expiredAt?.let {
+                append("expiredAt", it.toString())
+            }
+        }))
     }
 
 
@@ -42,7 +58,7 @@ class ApplicationTest {
         val targetLoc = "https://avdt.xyz"
 
         val shortRes = client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
 
@@ -56,13 +72,49 @@ class ApplicationTest {
         assertEquals(targetLoc, resultLocation)
     }
 
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun testShortenAndRedirectForExpiredAt() = testApplication {
+        setup()
+        val targetLoc = "https://avdt.xyz"
+
+        val shortRes = client.post("/shorten") {
+            setBodyX(targetLoc, currentLocalDateTime())
+            addXApiKey()
+        }
+
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+        assert(shortCode != null)
+
+        val redirectRes = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.NotFound, redirectRes.status)
+
+
+        val shortRes2 = client.post("/shorten") {
+            setBody(FormDataContent(Parameters.build {
+                append("url", targetLoc)
+                val tomorrow = (Clock.System.now() + 24.hours).toLocalDateTime(currentSystemDefault())
+                append("expiredAt", tomorrow.toString())
+            }))
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Created, shortRes2.status)
+        val shortCode2 = json.decodeFromString<JsonObject>(shortRes2.bodyAsText())["shortCode"]
+        assert(shortCode2 != null)
+        val redirectRes2 = client.get("/redirect?code=$shortCode2")
+        assertEquals(HttpStatusCode.Found, redirectRes2.status)
+        val resultLocation = redirectRes2.headers["Location"]
+        assertEquals(targetLoc, resultLocation)
+    }
+
     @Test
     fun testSameUrlShouldReturnDifferentShortCodes() = testApplication {
         setup()
         val targetLoc = "https://avdt.xyz"
 
         val shortRes = client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
 
@@ -71,7 +123,7 @@ class ApplicationTest {
         assert(originalShortCode != null)
 
         val duplicateRes = client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
         assertEquals(HttpStatusCode.Created, duplicateRes.status)
@@ -79,6 +131,7 @@ class ApplicationTest {
         assertNotEquals(originalShortCode, duplicateShortCode)
     }
 
+    @OptIn(ExperimentalTime::class)
     @Test
     fun testTopUrlsEndpoint() = testApplication {
         setup()
@@ -86,23 +139,23 @@ class ApplicationTest {
         val targetLoc = "https://avdt.xyz"
 
         client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
 
         client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
 
         client.post("/shorten") {
-            setBody(targetLoc)
+            setBodyX(targetLoc)
             addXApiKey()
         }
 
         val differentUrl = "https://mrwhoknows.com"
         client.post("/shorten") {
-            setBody(differentUrl)
+            setBodyX(differentUrl)
             addXApiKey()
         }
 
@@ -137,6 +190,9 @@ class ApplicationTest {
         setup()
         val shortRes = client.post("/shorten") {
             setBody("https://avdt.xyz")
+            setBody(FormDataContent(Parameters.build {
+                append("url", "https://avdt.xyz")
+            }))
             addXApiKey()
         }
         val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
@@ -154,25 +210,25 @@ class ApplicationTest {
     fun testInvalidUrl() = testApplication {
         setup()
         val shortRes = client.post("/shorten") {
-            setBody("avdt.xyz")
+            setBodyX("avdt.xyz")
             addXApiKey()
         }
         assertEquals(HttpStatusCode.BadRequest, shortRes.status)
 
         val emptyRes = client.post("/shorten") {
-            setBody("")
+            setBodyX("")
             addXApiKey()
         }
         assertEquals(HttpStatusCode.BadRequest, emptyRes.status)
 
         val httpRes = client.post("/shorten") {
-            setBody("http://avdt.xyz")
+            setBodyX("http://avdt.xyz")
             addXApiKey()
         }
         assertNotEquals(HttpStatusCode.BadRequest, httpRes.status)
 
         val httpsRes = client.post("/shorten") {
-            setBody("https://abc.xyz/test url")
+            setBodyX("https://abc.xyz/test url")
             addXApiKey()
         }
         assertNotEquals(HttpStatusCode.BadRequest, httpsRes.status)
@@ -192,13 +248,13 @@ class ApplicationTest {
     fun testDifferentUrlsShouldGenerateDifferentCodes() = testApplication {
         setup()
         val shortRes1 = client.post("/shorten") {
-            setBody("https://avdt.xyz")
+            setBodyX("https://avdt.xyz")
             addXApiKey()
         }
         val shortCode1 = json.decodeFromString<JsonObject>(shortRes1.bodyAsText())["shortCode"]
 
         val shortRes2 = client.post("/shorten") {
-            setBody("https://mrwhoknows.com")
+            setBodyX("https://mrwhoknows.com")
             addXApiKey()
         }
         val shortCode2 = json.decodeFromString<JsonObject>(shortRes2.bodyAsText())["shortCode"]
@@ -225,7 +281,7 @@ class ApplicationTest {
         setup()
         val targetLoc1 = "https://avdt.xyz"
         val shortRes = client.post("/shorten") {
-            setBody(targetLoc1)
+            setBodyX(targetLoc1)
             addXApiKey()
         }
         val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
@@ -236,12 +292,12 @@ class ApplicationTest {
 
         val targetLoc2 = "https://mrwhoknows.com"
         val result = client.put("/shorten/$shortCode") {
-            setBody(targetLoc2)
+            setBodyX(targetLoc2)
             addXApiKey()
         }
         assertEquals(HttpStatusCode.Accepted, result.status)
 
-        val withoutApiKey = client.put("/shorten/$shortCode") { setBody(targetLoc2) }
+        val withoutApiKey = client.put("/shorten/$shortCode") { setBodyX(targetLoc2) }
         assertEquals(HttpStatusCode.Unauthorized, withoutApiKey.status)
 
         val redirectAfterPutRes = client.get("/redirect?code=$shortCode")
@@ -249,9 +305,47 @@ class ApplicationTest {
         assertEquals(targetLoc2, resultLocation2)
 
         client.put("/shorten/$shortCode") {
-            setBody(targetLoc1)
+            setBodyX(targetLoc1)
             addXApiKey()
         }
+    }
+
+    @OptIn(ExperimentalTime::class)
+    @Test
+    fun testPutRequestForExpiredAt() = testApplication {
+        val tomorrow = (Clock.System.now() + 24.hours).toLocalDateTime(currentSystemDefault())
+        setup()
+        val targetLoc1 = "https://avdt.xyz"
+        val shortRes = client.post("/shorten") {
+            setBodyX(targetLoc1)
+            addXApiKey()
+        }
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+
+        val redirectRes = client.get("/redirect?code=$shortCode")
+        val resultLocation = redirectRes.headers["Location"]
+        assertEquals(targetLoc1, resultLocation)
+
+        val targetLoc2 = "https://mrwhoknows.com"
+        val result = client.put("/shorten/$shortCode") {
+            setBodyX(targetLoc2, currentLocalDateTime())
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Accepted, result.status)
+
+        val redirectAfterPutRes = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.NotFound, redirectAfterPutRes.status)
+
+        val result2 = client.put("/shorten/$shortCode") {
+            setBodyX(targetLoc2, tomorrow)
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Accepted, result2.status)
+
+        val redirectAfterPutRes2 = client.get("/redirect?code=$shortCode")
+        val resultLocation2 = redirectAfterPutRes2.headers["Location"]
+        assertEquals(targetLoc2, resultLocation2)
+
     }
 
     fun ApplicationTestBuilder.setup() {

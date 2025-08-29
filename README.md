@@ -2,6 +2,14 @@
 
 Simple URL Shortener API written in Ktor 🚀
 
+## Features
+
+- **URL Shortening**: Create short codes for long URLs
+- **Expiry Support**: Set expiration dates for shortened URLs
+- **User Management**: API key-based authentication
+- **Analytics**: Track visit counts and top URLs
+- **Soft Delete**: URLs can be marked as deleted without permanent removal
+
 ## How to run the server
 
 Run this command and server should be up, on port 8080
@@ -43,6 +51,16 @@ Use the following test API keys via the `x-api-key` header:
 
 - Alice: `sk_test_alice`
 - Bob: `sk_test_bob`
+
+## Expiry Support
+
+URLs can have expiration dates.
+
+- Expired URLs return 404 on redirect attempts.
+- Expiry can be updated via PUT requests.
+- Expired URLs are automatically filtered.
+
+Format: `YYYY-MM-DDTHH:MM:SS` (ISO 8601)
 
 ## API Performance
 
