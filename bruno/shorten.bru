@@ -6,7 +6,7 @@ meta {
 
 post {
   url: {{base_url}}/shorten
-  body: text
+  body: formUrlEncoded
   auth: inherit
 }
 
@@ -14,8 +14,9 @@ headers {
   x-api-key: {{api_key}}
 }
 
-body:text {
-  http://example.com/
+body:form-urlencoded {
+  url: https://shrtkt.onrender.com
+  expiredAt: 2025-08-29T19:20:44
 }
 
 settings {

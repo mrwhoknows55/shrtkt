@@ -8,7 +8,7 @@ Simple URL Shortener API written in Ktor 🚀
 - **Expiry Support**: Set expiration dates for shortened URLs
 - **User Management**: API key-based authentication
 - **Analytics**: Track visit counts and top URLs
-- **Soft Delete**: URLs can be marked as deleted without permanent removal
+- **Delete**: URLs can be marked as deleted
 
 ## How to run the server
 
