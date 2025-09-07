@@ -10,8 +10,8 @@ import kotlinx.datetime.TimeZone.Companion.currentSystemDefault
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import xyz.avdt.models.BulkUrlResponse
 import xyz.avdt.utils.currentLocalDateTime
-import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -311,7 +311,8 @@ class ApplicationTest {
             setBodyX(targetLoc1)
             addXApiKey()
         }
-        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+        val shortCode =
+            json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"].toString().replace("\"", "")
 
         val redirectRes = client.get("/redirect?code=$shortCode")
         val resultLocation = redirectRes.headers["Location"]
@@ -354,7 +355,7 @@ class ApplicationTest {
         assertEquals(targetLoc1, resultLocation)
 
         val targetLoc2 = "https://mrwhoknows.com"
-        val customCode = Random.nextBytes(10).toString()
+        val customCode = System.currentTimeMillis().toString()
         val result = client.put("/shorten/$shortCode") {
             setBodyX(targetLoc2, shortCode = customCode)
             addXApiKey()
@@ -368,10 +369,10 @@ class ApplicationTest {
         val resultLocation2 = redirectAfterPutRes.headers["Location"]
         assertEquals(targetLoc2, resultLocation2)
 
-//        client.put("/shorten/$customCode") {
-//            setBodyX(targetLoc1)
-//            addXApiKey()
-//        }
+        client.put("/shorten/$shortCode") {
+            setBodyX(targetLoc1)
+            addXApiKey()
+        }
     }
 
 
@@ -385,7 +386,8 @@ class ApplicationTest {
             setBodyX(targetLoc1)
             addXApiKey()
         }
-        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+        val shortCode =
+            json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"].toString().replace("\"", "")
 
         val redirectRes = client.get("/redirect?code=$shortCode")
         val resultLocation = redirectRes.headers["Location"]
@@ -411,6 +413,38 @@ class ApplicationTest {
         val resultLocation2 = redirectAfterPutRes2.headers["Location"]
         assertEquals(targetLoc2, resultLocation2)
 
+    }
+
+    @Test
+    fun testBulkShorten() = testApplication {
+        setup()
+
+        val bulkRequest = """
+        [
+            {
+                "redirectUrl": "https://google.com"
+            },
+            {
+                "redirectUrl": "https://github.com"
+            },
+            {
+                "redirectUrl": "https://stackoverflow.com"
+            }
+        ]
+        """.trimIndent()
+
+        val bulkRes = client.post("/bulk/shorten") {
+            header("Content-Type", "application/json")
+            addXApiKey()
+            setBody(bulkRequest)
+        }
+
+        assertEquals(HttpStatusCode.Created, bulkRes.status)
+
+        val responseBody = bulkRes.bodyAsText()
+        val responseJson = json.decodeFromString<BulkUrlResponse>(responseBody)
+
+        assertEquals(3, responseJson.results.count())
     }
 
     fun ApplicationTestBuilder.setup() {

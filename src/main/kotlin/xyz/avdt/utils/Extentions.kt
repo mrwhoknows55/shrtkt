@@ -17,5 +17,5 @@ fun Application.getDatabaseEnv(key: String): String? = environment.config.tryGet
 
 sealed interface Resource<T> {
     data class Result<T>(val data: T) : Resource<T>
-    data class Error<T>(val code: HttpStatusCode) : Resource<T>
+    data class Error<T>(val code: HttpStatusCode, val message: String = code.description) : Resource<T>
 }

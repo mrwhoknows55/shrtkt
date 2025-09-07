@@ -1,0 +1,58 @@
+meta {
+  name: bulk-shorten
+  type: http
+  seq: 8
+}
+
+post {
+  url: {{base_url}}/bulk/shorten
+  body: json
+  auth: inherit
+}
+
+headers {
+  x-api-key: {{api_key}}
+  Content-Type: application/json
+}
+
+body:json {
+  [
+    {
+      "redirectUrl": "https://google.com",
+      "shortCode": "google"
+    },
+    {
+      "redirectUrl": "https://github.com",
+      "shortCode": "github"
+    },
+    {
+      "redirectUrl": "https://stackoverflow.com",
+      "expiresAt": "2025-09-30T12:00:00",
+      "shortCode": "overflow"
+    }
+  ]
+}
+
+tests {
+  test("Status code is 201, 207, or 500", function() {
+    expect([201, 207, 500]).toInclude(res.getStatus());
+  });
+  
+  test("Response has summary", function() {
+    expect(res.getBody()).toHaveProperty("summary");
+    expect(res.getBody().summary).toHaveProperty("total");
+    expect(res.getBody().summary).toHaveProperty("success");
+    expect(res.getBody().summary).toHaveProperty("error");
+  });
+  
+  test("Response has results array", function() {
+    expect(res.getBody()).toHaveProperty("results");
+    expect(res.getBody().results).toBeArray();
+  });
+  
+  test("Summary totals match", function() {
+    const body = res.getBody();
+    expect(body.summary.total).toBe(body.results.length);
+    expect(body.summary.success + body.summary.error).toBe(body.summary.total);
+  });
+}

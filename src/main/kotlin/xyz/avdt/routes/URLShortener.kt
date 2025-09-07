@@ -6,7 +6,6 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
-import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
@@ -20,6 +19,10 @@ import xyz.avdt.entities.UrlTable.expiredAt
 import xyz.avdt.entities.UrlTable.redirectUrl
 import xyz.avdt.entities.UrlTable.shortCode
 import xyz.avdt.entities.UserTable
+import xyz.avdt.models.BulkUrlResponse
+import xyz.avdt.models.BulkUrlResponse.Summary
+import xyz.avdt.models.UrlRequest
+import xyz.avdt.models.UrlResponse
 import xyz.avdt.utils.Resource.Error
 import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
@@ -128,7 +131,7 @@ fun Routing.urlShortenerRoutes() {
             }
             val userId = id!!
             val params = call.receiveParameters()
-            val shortCode = call.request.pathVariables["shortCode"].orEmpty().ifBlank {
+            val urlShortCode = call.request.pathVariables["shortCode"].orEmpty().ifBlank {
                 return@put call.respondText(
                     "wrong request format for short code", status = HttpStatusCode.BadRequest
                 )
@@ -152,26 +155,28 @@ fun Routing.urlShortenerRoutes() {
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
             val count = transaction {
-                UrlTable.update({
-                    UrlTable.shortCodeEq(shortCode).and {
+                runCatching {
+                    UrlTable.update({
                         UrlTable.userId eq userId
+                        UrlTable.shortCodeEq(urlShortCode)
+                    }) {
+                        it[redirectUrl] = urlToUpdate
+                        it[UrlTable.shortCode] = customCode.ifBlank { urlShortCode }
+                        it[expiredAt] = expiredAtTime
+                        it[deletedAt] = null
                     }
-                }) {
-                    it[redirectUrl] = urlToUpdate
-                    it[expiredAt] = expiredAtTime
-                    if (customCode.isNotBlank()) {
-                        it[UrlTable.shortCode] = customCode
-                    }
-                    it[deletedAt] = null
+                }.getOrElse {
+                    println(it)
+                    -1
                 }
             }
 
             if (count > 0) {
-                println("updated url $urlToUpdate on shortCode: $shortCode")
-                return@put call.respond(HttpStatusCode.Accepted, mapOf("shortCode" to shortCode))
+                println("updated url $urlToUpdate on shortCode: $urlShortCode")
+                return@put call.respond(HttpStatusCode.Accepted, mapOf("shortCode" to urlShortCode))
             } else {
                 return@put call.respondText(
-                    "URL for the short code doesn't exist for this user", status = HttpStatusCode.NotFound
+                    text = "URL for the short code doesn't exist for this user", status = HttpStatusCode.NotFound
                 )
             }
 
@@ -184,24 +189,28 @@ fun Routing.urlShortenerRoutes() {
         }
 
         delete("/{shortCode}") {
-            val shortCode = call.request.pathVariables["shortCode"]?.replace("\"", "").orEmpty().ifBlank {
-                return@delete call.respondText(
-                    "wrong request format for short code", status = HttpStatusCode.BadRequest
-                )
-            }
             val (id, error) = call.getUserId()
             if (error != null) {
                 return@delete error
             }
             val userId = id!!
+            val shortCode = call.request.pathVariables["shortCode"]?.replace("\"", "").orEmpty().ifBlank {
+                return@delete call.respondText(
+                    "wrong request format for short code", status = HttpStatusCode.BadRequest
+                )
+            }
 
             val result = transaction {
                 runCatching {
                     UrlTable.update({
-                        UrlTable.shortCodeEq(shortCode).and { UrlTable.userId eq userId and deletedAt.isNull() }
+                        UrlTable.shortCodeEq(shortCode)
+                        UrlTable.userId eq userId
+                        deletedAt.isNull()
                     }) {
                         it[deletedAt] = currentLocalDateTime()
                     }
+                }.onFailure {
+                    println(it)
                 }.getOrElse { -1 }
             }
 
@@ -213,6 +222,98 @@ fun Routing.urlShortenerRoutes() {
                 call.respondText("short code not found for the user", status = HttpStatusCode.NotFound)
             }
 
+        }
+    }
+
+    fun createShortUrl(request: UrlRequest, userId: Long): UrlResponse {
+        val expiredAtTime = runCatching {
+            if (request.expiresAt.isNullOrBlank()) {
+                null
+            } else {
+                LocalDateTime.parse(request.expiresAt.orEmpty())
+            }
+        }.getOrElse {
+            return UrlResponse(
+                success = false, message = "invalid expiresAt format", redirectUrl = null, shortCode = null
+            )
+        }
+        val result = transaction {
+            runCatching {
+                val result = UrlTable.insert {
+                    if (!request.shortCode.isNullOrBlank()) {
+                        it[shortCode] = request.shortCode
+                    }
+                    it[redirectUrl] = request.redirectUrl
+                    it[UrlTable.userId] = userId
+                    it[deletedAt] = null
+                    it[expiredAt] = expiredAtTime
+                }
+                val res = (result get shortCode).orEmpty().ifBlank { (result get UrlTable.id).toString() }
+                Result(data = res)
+            }.getOrElse {
+                when {
+                    it.message.orEmpty().contains("violates unique constraint", true) -> Error(
+                        code = HttpStatusCode.Conflict, message = "short code already exists"
+                    )
+
+                    else -> Error(
+                        code = HttpStatusCode.InternalServerError, message = "something went wrong"
+                    )
+                }
+            }
+        }
+
+        return when (result) {
+            is Result -> {
+                println("added ${request.redirectUrl} on ${result.data} code")
+                UrlResponse(
+                    success = true,
+                    message = "added ${request.redirectUrl} on ${result.data} code",
+                    redirectUrl = request.redirectUrl,
+                    shortCode = result.data,
+                    expiresAt = expiredAtTime.toString(),
+                )
+            }
+
+            is Error -> {
+                UrlResponse(
+                    success = false, message = result.message, redirectUrl = null, shortCode = null
+                )
+            }
+        }
+    }
+
+    route("/bulk") {
+        post("/shorten") {
+            val (id, error) = call.getUserId()
+            if (error != null) {
+                return@post error
+            }
+            val userId = id!!
+            val body = runCatching { call.receive<List<UrlRequest>>() }.getOrElse {
+                return@post call.respondText("Bad request", status = HttpStatusCode.BadRequest)
+            }
+            val results = body.map {
+                createShortUrl(it, userId)
+            }
+
+            val response = BulkUrlResponse(
+                summary = Summary(
+                    total = body.count(),
+                    success = results.count { it.success },
+                    error = results.count { it.success.not() },
+                ),
+                results = results,
+            )
+
+            return@post call.respond(
+                message = response,
+                status = when (response.summary.total) {
+                    response.summary.success -> HttpStatusCode.Created
+                    response.summary.error -> HttpStatusCode.InternalServerError
+                    else -> HttpStatusCode.MultiStatus
+                }
+            )
         }
     }
 
