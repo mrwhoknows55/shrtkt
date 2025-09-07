@@ -6,6 +6,7 @@ import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.LocalDateTime
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
+import org.jetbrains.exposed.v1.core.and
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.or
 import org.jetbrains.exposed.v1.jdbc.andWhere
@@ -19,6 +20,8 @@ import xyz.avdt.entities.UrlTable.expiredAt
 import xyz.avdt.entities.UrlTable.redirectUrl
 import xyz.avdt.entities.UrlTable.shortCode
 import xyz.avdt.entities.UserTable
+import xyz.avdt.utils.Resource.Error
+import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
 import kotlin.time.ExperimentalTime
 
@@ -58,6 +61,7 @@ fun Routing.urlShortenerRoutes() {
                 status = HttpStatusCode.BadRequest, "invalid url"
             )
             val expiredAtStr = params["expiredAt"].orEmpty()
+            val customShortCode = params["shortCode"].orEmpty().trim()
             val expiredAtTime = runCatching {
                 if (expiredAtStr.isNotBlank()) {
                     LocalDateTime.parse(expiredAtStr)
@@ -69,22 +73,46 @@ fun Routing.urlShortenerRoutes() {
                     "wrong request format for expiredAt param", status = HttpStatusCode.BadRequest
                 )
             }.getOrNull()
-            val shortCode = transaction {
+            val result = transaction {
                 runCatching {
-                    UrlTable.insert {
+                    val result = UrlTable.insert {
+                        if (customShortCode.isNotBlank()) {
+                            it[shortCode] = customShortCode
+                        }
                         it[redirectUrl] = longUrl
                         it[UrlTable.userId] = userId
                         it[deletedAt] = null
                         it[expiredAt] = expiredAtTime
-                    } get shortCode
-                }.getOrNull()
+                    }
+                    val res = (result get shortCode).orEmpty().ifBlank { (result get UrlTable.id).toString() }
+                    Result(data = res)
+                }.getOrElse {
+                    when {
+                        it.message.orEmpty()
+                            .contains("violates unique constraint", true) -> Error(HttpStatusCode.Conflict)
+
+                        else -> Error(HttpStatusCode.NotFound)
+                    }
+                }
             }
 
-            shortCode?.let {
-                println("added $longUrl on $it code")
-                return@post call.respond(HttpStatusCode.Created, mapOf("shortCode" to it))
+            when (result) {
+                is Result -> {
+                    println("added $longUrl on ${result.data} code")
+                    call.respond(HttpStatusCode.Created, mapOf("shortCode" to result.data))
+                }
+
+                is Error -> {
+                    when (result.code) {
+                        HttpStatusCode.Conflict -> call.respondText(
+                            "Short code already exists", status = HttpStatusCode.Conflict
+                        )
+
+                        HttpStatusCode.NotFound -> call.respondText("URL not found", status = HttpStatusCode.NotFound)
+                        else -> call.respondText(result.code.description, status = result.code)
+                    }
+                }
             }
-            return@post call.respondText("URL not found", status = HttpStatusCode.NotFound)
         }
 
         put {
@@ -100,11 +128,14 @@ fun Routing.urlShortenerRoutes() {
             }
             val userId = id!!
             val params = call.receiveParameters()
-            val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@put call.respondText(
-                "wrong request format for short code", status = HttpStatusCode.BadRequest
-            )
+            val shortCode = call.request.pathVariables["shortCode"].orEmpty().ifBlank {
+                return@put call.respondText(
+                    "wrong request format for short code", status = HttpStatusCode.BadRequest
+                )
+            }
             val encodedUrl = params["url"].orEmpty().trim()
             val expiredAtStr = params["expiredAt"].orEmpty()
+            val customCode = params["shortCode"].orEmpty().trim()
             val expiredAtTime = runCatching {
                 if (expiredAtStr.isNotBlank()) {
                     LocalDateTime.parse(expiredAtStr)
@@ -122,12 +153,16 @@ fun Routing.urlShortenerRoutes() {
             )
             val count = transaction {
                 UrlTable.update({
-                    UrlTable.shortCode eq shortCode
-                    UrlTable.userId eq userId
+                    UrlTable.shortCodeEq(shortCode).and {
+                        UrlTable.userId eq userId
+                    }
                 }) {
                     it[redirectUrl] = urlToUpdate
-                    it[deletedAt] = null
                     it[expiredAt] = expiredAtTime
+                    if (customCode.isNotBlank()) {
+                        it[UrlTable.shortCode] = customCode
+                    }
+                    it[deletedAt] = null
                 }
             }
 
@@ -149,9 +184,11 @@ fun Routing.urlShortenerRoutes() {
         }
 
         delete("/{shortCode}") {
-            val shortCode = call.request.pathVariables["shortCode"]?.toLongOrNull() ?: return@delete call.respondText(
-                "wrong request format for short code", status = HttpStatusCode.BadRequest
-            )
+            val shortCode = call.request.pathVariables["shortCode"]?.replace("\"", "").orEmpty().ifBlank {
+                return@delete call.respondText(
+                    "wrong request format for short code", status = HttpStatusCode.BadRequest
+                )
+            }
             val (id, error) = call.getUserId()
             if (error != null) {
                 return@delete error
@@ -161,9 +198,7 @@ fun Routing.urlShortenerRoutes() {
             val result = transaction {
                 runCatching {
                     UrlTable.update({
-                        UrlTable.shortCode eq shortCode
-                        UrlTable.userId eq userId
-                        deletedAt.isNull()
+                        UrlTable.shortCodeEq(shortCode).and { UrlTable.userId eq userId and deletedAt.isNull() }
                     }) {
                         it[deletedAt] = currentLocalDateTime()
                     }
@@ -172,7 +207,7 @@ fun Routing.urlShortenerRoutes() {
 
             if (result > 0) {
                 println("shortCode: $shortCode deleted successfully")
-                call.respondText("short code deleted successfully", status = HttpStatusCode.NoContent)
+                call.respondText("short code deleted successfully", status = HttpStatusCode.OK)
             } else {
                 println("shortCode: $shortCode not found")
                 call.respondText("short code not found for the user", status = HttpStatusCode.NotFound)
@@ -182,13 +217,14 @@ fun Routing.urlShortenerRoutes() {
     }
 
     get("/redirect") {
-        val code = call.request.queryParameters["code"]?.toLongOrNull() ?: return@get call.respondText(
+        val code = call.request.queryParameters["code"]?.replace("\"", "") ?: return@get call.respondText(
             "wrong request format for short code", status = HttpStatusCode.BadRequest
         )
         val result = transaction {
+            val codeL = code.trim().toLongOrNull() ?: 0
             runCatching {
                 val longUrl = UrlTable.select(redirectUrl).where {
-                    shortCode eq code
+                    (UrlTable.id eq codeL) or (shortCode eq code)
                 }.andWhere {
                     deletedAt.isNull()
                 }.andWhere {
@@ -203,7 +239,7 @@ fun Routing.urlShortenerRoutes() {
             runCatching {
                 transaction {
                     UrlTable.update(where = {
-                        shortCode eq code
+                        UrlTable.shortCodeEq(code)
                         deletedAt.isNull()
                     }) {
                         it[visitCount] = visitCount + 1

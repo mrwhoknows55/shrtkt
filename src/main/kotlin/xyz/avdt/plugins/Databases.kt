@@ -23,21 +23,15 @@ fun Application.configureDatabases() {
     transaction {
         SchemaUtils.create(UrlTable)
         val statements = MigrationUtils.statementsRequiredForDatabaseMigration(UrlTable, UserTable)
+        val deleteStatements = MigrationUtils.dropUnmappedColumnsStatements(UrlTable, UserTable)
         transaction {
-            runCatching {
-                exec("ALTER TABLE urls DROP CONSTRAINT IF EXISTS urls_redirect_url_unique")
-                exec("DROP INDEX IF EXISTS urls_redirect_url_unique")
-                println("Dropped unique index on redirect_url")
-            }.onFailure {
-                it.printStackTrace()
-            }
-            runCatching {
-                statements.forEach {
+            (deleteStatements + statements).forEach {
+                runCatching {
                     println("executing migration statement: $it")
                     exec(it)
+                }.onFailure {
+                    it.printStackTrace()
                 }
-            }.onFailure {
-                it.printStackTrace()
             }
 
             runCatching {
