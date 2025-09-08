@@ -435,4 +435,33 @@ fun Routing.urlShortenerRoutes() {
         }
     }
 
+    get("/urls") {
+        val (id, error) = call.getUserId()
+        if (error != null) {
+            return@get error
+        }
+        val userId = id!!
+
+        val urls: List<Map<String, String>> = transaction {
+            runCatching {
+                UrlTable.select(UrlTable.id, shortCode, redirectUrl).where {
+                    UrlTable.userId eq userId
+                }.andWhere {
+                    deletedAt.isNull()
+                }.andWhere {
+                    expiredAt.isNull() or (expiredAt greater currentLocalDateTime())
+                }.map {
+                    val code = it[shortCode] ?: it[UrlTable.id].toString()
+                    val redirectUrl = it[redirectUrl]
+                    mapOf("shortCode" to code, "redirectUrl" to redirectUrl)
+                }
+            }.getOrNull() ?: emptyList()
+        }
+
+        if (urls.isEmpty()) {
+            return@get call.respondText("No URLs available for this user", status = HttpStatusCode.NotFound)
+        } else {
+            return@get call.respond(urls)
+        }
+    }
 }

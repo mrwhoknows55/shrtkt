@@ -1,0 +1,19 @@
+meta {
+  name: all-urls
+  type: http
+  seq: 10
+}
+
+get {
+  url: {{base_url}}/urls
+  body: none
+  auth: inherit
+}
+
+headers {
+  x-api-key: {{api_key}}
+}
+
+settings {
+  encodeUrl: false
+}

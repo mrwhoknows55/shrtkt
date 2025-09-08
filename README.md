@@ -10,6 +10,7 @@ Simple URL Shortener API written in Ktor 🚀
 - **Analytics**: Track visit counts and top URLs
 - **Delete**: URLs can be marked as deleted
 - **User Tiers**: `HOBBY` and `ENTERPRISE` with tier-based access (bulk is enterprise-only)
+- **User Urls**: `GET /urls` returns a list of the user's shortened URLs with longUrls.
 - **Bulk Shorten**: `POST /bulk/shorten` accepts an array of requests and returns per-item results with a summary
 - **Custom Short Code**: provide `shortCode` on create/update to set your own code
 - **Password Protection**: optional `password` required at redirect
