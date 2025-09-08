@@ -9,6 +9,9 @@ Simple URL Shortener API written in Ktor 🚀
 - **User Management**: API key-based authentication
 - **Analytics**: Track visit counts and top URLs
 - **Delete**: URLs can be marked as deleted
+- **User Tiers**: `HOBBY` and `ENTERPRISE` with tier-based access (bulk is enterprise-only)
+- **Bulk Shorten**: `POST /bulk/shorten` accepts an array of requests and returns per-item results with a summary
+- **Custom Short Code**: provide `shortCode` on create/update to set your own code
 
 ## How to run the server
 
