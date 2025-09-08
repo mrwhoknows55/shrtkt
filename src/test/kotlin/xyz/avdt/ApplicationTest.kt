@@ -278,6 +278,68 @@ class ApplicationTest {
     }
 
     @Test
+    fun testRedirectWithPassword() = testApplication {
+        setup()
+        val targetLoc = "https://resume.mrwhoknows.com"
+
+        val password = "resume-knows"
+        val shortRes = client.post("/shorten") {
+            setBody(FormDataContent(Parameters.build {
+                append("url", targetLoc)
+                append("password", password)
+            }))
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]
+
+        val noPwd = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Forbidden, noPwd.status)
+
+        val wrongPwd = client.get("/redirect?code=$shortCode&password=wrong")
+        assertEquals(HttpStatusCode.Forbidden, wrongPwd.status)
+
+        val ok = client.get("/redirect?code=$shortCode&password=$password")
+        assertEquals(HttpStatusCode.Found, ok.status)
+        assertEquals(targetLoc, ok.headers["Location"])
+    }
+
+    @Test
+    fun testUpdatePassword() = testApplication {
+        setup()
+        val targetLoc = "https://google.com"
+
+        val shortRes = client.post("/shorten") {
+            setBodyX(targetLoc)
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val shortCode =
+            json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"].toString().replace("\"", "")
+
+        val openRedirect = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Found, openRedirect.status)
+        assertEquals(targetLoc, openRedirect.headers["Location"])
+
+        val newPassword = "new-pass"
+        val updateRes = client.put("/shorten/$shortCode") {
+            setBody(FormDataContent(Parameters.build {
+                append("url", targetLoc)
+                append("password", newPassword)
+            }))
+            addXApiKey()
+        }
+        assertEquals(HttpStatusCode.Accepted, updateRes.status)
+
+        val blocked = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Forbidden, blocked.status)
+
+        val allowed = client.get("/redirect?code=$shortCode&password=$newPassword")
+        assertEquals(HttpStatusCode.Found, allowed.status)
+        assertEquals(targetLoc, allowed.headers["Location"])
+    }
+
+    @Test
     fun testDifferentUrlsShouldGenerateDifferentCodes() = testApplication {
         setup()
         val shortRes1 = client.post("/shorten") {

@@ -17,6 +17,7 @@ object UrlTable : Table("urls") {
     val userId = reference("user_id", UserTable.id).nullable().default(null)
     val deletedAt = datetime("deleted_at").nullable().default(null)
     val expiredAt = datetime("expired_at").nullable().default(null)
+    val password = text("password").nullable().default(null)
 
     fun shortCodeEq(code: String): Op<Boolean> =
         (code.toLongOrNull()?.let { id eq it } ?: Op.FALSE) or (shortCode eq code)

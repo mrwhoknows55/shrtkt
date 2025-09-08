@@ -12,6 +12,7 @@ Simple URL Shortener API written in Ktor 🚀
 - **User Tiers**: `HOBBY` and `ENTERPRISE` with tier-based access (bulk is enterprise-only)
 - **Bulk Shorten**: `POST /bulk/shorten` accepts an array of requests and returns per-item results with a summary
 - **Custom Short Code**: provide `shortCode` on create/update to set your own code
+- **Password Protection**: optional `password` required at redirect
 
 ## How to run the server
 

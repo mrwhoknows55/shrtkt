@@ -68,6 +68,7 @@ fun Routing.urlShortenerRoutes() {
             )
             val expiredAtStr = params["expiredAt"].orEmpty()
             val customShortCode = params["shortCode"].orEmpty().trim()
+            val password = params["password"]
             val expiredAtTime = runCatching {
                 if (expiredAtStr.isNotBlank()) {
                     LocalDateTime.parse(expiredAtStr)
@@ -89,6 +90,7 @@ fun Routing.urlShortenerRoutes() {
                         it[UrlTable.userId] = userId
                         it[deletedAt] = null
                         it[expiredAt] = expiredAtTime
+                        it[UrlTable.password] = password
                     }
                     val res = (result get shortCode).orEmpty().ifBlank { (result get UrlTable.id).toString() }
                     Result(data = res)
@@ -142,6 +144,7 @@ fun Routing.urlShortenerRoutes() {
             val encodedUrl = params["url"].orEmpty().trim()
             val expiredAtStr = params["expiredAt"].orEmpty()
             val customCode = params["shortCode"].orEmpty().trim()
+            val password = params["password"]
             val expiredAtTime = runCatching {
                 if (expiredAtStr.isNotBlank()) {
                     LocalDateTime.parse(expiredAtStr)
@@ -167,6 +170,9 @@ fun Routing.urlShortenerRoutes() {
                         it[UrlTable.shortCode] = customCode.ifBlank { urlShortCode }
                         it[expiredAt] = expiredAtTime
                         it[deletedAt] = null
+                        if (password != null) {
+                            it[UrlTable.password] = password
+                        }
                     }
                 }.getOrElse {
                     println(it)
@@ -324,22 +330,26 @@ fun Routing.urlShortenerRoutes() {
         val code = call.request.queryParameters["code"]?.replace("\"", "") ?: return@get call.respondText(
             "wrong request format for short code", status = HttpStatusCode.BadRequest
         )
+        val password = call.request.queryParameters["password"]
         val result = transaction {
             val codeL = code.trim().toLongOrNull() ?: 0
             runCatching {
-                val longUrl = UrlTable.select(redirectUrl).where {
+                val longUrl = UrlTable.select(redirectUrl, UrlTable.password).where {
                     (UrlTable.id eq codeL) or (shortCode eq code)
                 }.andWhere {
                     deletedAt.isNull()
                 }.andWhere {
                     expiredAt.isNull() or (expiredAt greater currentLocalDateTime())
-                }.single()[redirectUrl]
-                return@transaction longUrl
+                }.single()
+                return@transaction longUrl[redirectUrl] to longUrl[UrlTable.password]
             }.onFailure {
                 println("${it.message}")
             }.getOrNull()
         }
-        result?.let { url ->
+        result?.let { (url, urlPassword) ->
+            if (urlPassword != password) {
+                return@get call.respondText("Incorrect password", status = HttpStatusCode.Forbidden)
+            }
             runCatching {
                 transaction {
                     UrlTable.update(where = {
