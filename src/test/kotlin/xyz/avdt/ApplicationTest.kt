@@ -25,6 +25,7 @@ class ApplicationTest {
         ignoreUnknownKeys = true
     }
     val apiKey = "1234"
+    val enterpriseApiKey = "3456"
     val userName = "test"
     val email = "test"
     fun HttpRequestBuilder.addXApiKey(xApiKey: String = apiKey) {
@@ -435,7 +436,7 @@ class ApplicationTest {
 
         val bulkRes = client.post("/bulk/shorten") {
             header("Content-Type", "application/json")
-            addXApiKey()
+            addXApiKey(enterpriseApiKey)
             setBody(bulkRequest)
         }
 
@@ -445,6 +446,13 @@ class ApplicationTest {
         val responseJson = json.decodeFromString<BulkUrlResponse>(responseBody)
 
         assertEquals(3, responseJson.results.count())
+
+        val bulkResInvalidTier = client.post("/bulk/shorten") {
+            header("Content-Type", "application/json")
+            addXApiKey()
+            setBody(bulkRequest)
+        }
+        assertEquals(HttpStatusCode.Unauthorized, bulkResInvalidTier.status)
     }
 
     fun ApplicationTestBuilder.setup() {
@@ -466,6 +474,15 @@ class ApplicationTest {
                     append("email", email)
                 }))
                 addXApiKey()
+            }
+
+            client.post("/user") {
+                setBody(FormDataContent(Parameters.build {
+                    append("name", userName + "_enterprise")
+                    append("email", email + "_enterprise")
+                    append("tier", "enterprise")
+                }))
+                addXApiKey(enterpriseApiKey)
             }
         }
     }

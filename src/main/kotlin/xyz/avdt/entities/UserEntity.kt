@@ -10,6 +10,11 @@ object UserTable : Table("users") {
     val name = text("name").nullable()
     val apiKey = text("api_key")
     val createdAt = datetime("created_at").default(currentLocalDateTime()).clientDefault { currentLocalDateTime() }
+    val tier = enumerationByName("tier", 20, UserTier::class).default(UserTier.HOBBY)
 
     override val primaryKey = PrimaryKey(id)
+}
+
+enum class UserTier {
+    HOBBY, ENTERPRISE
 }

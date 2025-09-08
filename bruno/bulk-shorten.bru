@@ -11,7 +11,7 @@ post {
 }
 
 headers {
-  x-api-key: {{api_key}}
+  x-api-key: {{enterprise_api_key}}
   Content-Type: application/json
 }
 
@@ -36,6 +36,16 @@ body:json {
 tests {
   test("Status code is 201, 207, or 500", function() {
     expect([201, 207, 500]).toInclude(res.getStatus());
+  });
+  
+  test("Unauthorized for hobby tier", async function() {
+    const hobbyRes = await bru.request({
+      method: 'POST',
+      url: `${bru.getVar('base_url')}/bulk/shorten`,
+      headers: { 'x-api-key': bru.getVar('api_key'), 'Content-Type': 'application/json' },
+      body: req.getBody()
+    });
+    expect(hobbyRes.getStatus()).toBe(401);
   });
   
   test("Response has summary", function() {

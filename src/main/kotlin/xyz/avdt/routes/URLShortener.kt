@@ -19,6 +19,7 @@ import xyz.avdt.entities.UrlTable.expiredAt
 import xyz.avdt.entities.UrlTable.redirectUrl
 import xyz.avdt.entities.UrlTable.shortCode
 import xyz.avdt.entities.UserTable
+import xyz.avdt.entities.UserTier
 import xyz.avdt.models.BulkUrlResponse
 import xyz.avdt.models.BulkUrlResponse.Summary
 import xyz.avdt.models.UrlRequest
@@ -31,7 +32,7 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
 
-    suspend fun RoutingCall.getUserId(): Pair<Long?, Unit?> {
+    suspend fun RoutingCall.getUserId(tierToCheck: UserTier = UserTier.HOBBY): Pair<Long?, Unit?> {
         val apiKey = request.headers["x-api-key"].orEmpty()
         if (apiKey.isEmpty()) {
             return null to respond(
@@ -40,13 +41,13 @@ fun Routing.urlShortenerRoutes() {
         }
         val userId = transaction {
             runCatching {
-                UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }.limit(1).single()[UserTable.id]
+                UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }
+                    .andWhere { UserTable.tier eq tierToCheck }.limit(1).single()[UserTable.id]
             }.onFailure {
                 it.printStackTrace()
-
             }.getOrNull()
         } ?: return (null to respond(
-            HttpStatusCode.Unauthorized, "Invalid api key"
+            HttpStatusCode.Unauthorized, "Invalid API key or access tier not permitted."
         ))
         return userId to null
     }
@@ -285,7 +286,7 @@ fun Routing.urlShortenerRoutes() {
 
     route("/bulk") {
         post("/shorten") {
-            val (id, error) = call.getUserId()
+            val (id, error) = call.getUserId(UserTier.ENTERPRISE)
             if (error != null) {
                 return@post error
             }
@@ -386,6 +387,11 @@ fun Routing.urlShortenerRoutes() {
         val params = call.receiveParameters()
         val name = params["name"].orEmpty()
         val email = params["email"].orEmpty()
+        val tier = if (params["tier"].orEmpty().equals(UserTier.ENTERPRISE.name, ignoreCase = true)) {
+            UserTier.ENTERPRISE
+        } else {
+            UserTier.HOBBY
+        }
         if (name.isEmpty() || email.isEmpty()) {
             return@post call.respond(
                 HttpStatusCode.BadRequest, "Missing parameters"
@@ -397,6 +403,7 @@ fun Routing.urlShortenerRoutes() {
                     it[UserTable.name] = name
                     it[UserTable.apiKey] = apiKey
                     it[UserTable.email] = email
+                    it[UserTable.tier] = tier
                 }
             }
         }.onSuccess {

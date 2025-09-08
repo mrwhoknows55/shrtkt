@@ -1,7 +1,7 @@
 meta {
-  name: create-user
+  name: user
   type: http
-  seq: 2
+  seq: 9
 }
 
 post {
@@ -11,12 +11,13 @@ post {
 }
 
 headers {
-  x-api-key: {{api_key}}
+  x-api-key: {{enterprise_api_key}}
 }
 
 body:form-urlencoded {
-  name: Alice
-  email: alice@example.com
+  name: Bob Enterprise
+  email: bob@example.com
+  tier: enterprise
 }
 
 settings {
