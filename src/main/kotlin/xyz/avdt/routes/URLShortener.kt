@@ -5,6 +5,7 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.LocalDateTime
+import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.or
@@ -32,7 +33,7 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
 
-    suspend fun RoutingCall.getUserId(tierToCheck: UserTier = UserTier.HOBBY): Pair<Long?, Unit?> {
+    suspend fun RoutingCall.getUserId(tierToCheck: UserTier? = null): Pair<Long?, Unit?> {
         val apiKey = request.headers["x-api-key"].orEmpty()
         if (apiKey.isEmpty()) {
             return null to respond(
@@ -42,7 +43,8 @@ fun Routing.urlShortenerRoutes() {
         val userId = transaction {
             runCatching {
                 UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }
-                    .andWhere { UserTable.tier eq tierToCheck }.limit(1).single()[UserTable.id]
+                    .andWhere { tierToCheck?.let { UserTable.tier eq tierToCheck } ?: Op.TRUE }.limit(1)
+                    .single()[UserTable.id]
             }.onFailure {
                 it.printStackTrace()
             }.getOrNull()
