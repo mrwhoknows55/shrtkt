@@ -6,6 +6,7 @@ import org.jetbrains.exposed.v1.jdbc.SchemaUtils
 import org.jetbrains.exposed.v1.jdbc.selectAll
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.migration.MigrationUtils
+import xyz.avdt.entities.ApiLogTable
 import xyz.avdt.entities.UrlTable
 import xyz.avdt.entities.UserTable
 import xyz.avdt.utils.getDatabaseEnv
@@ -20,6 +21,9 @@ fun Application.configureDatabases() {
     Database.connect(
         "jdbc:postgresql://$host:$port/$dbName", driver = "org.postgresql.Driver", user = user, password = password
     )
+    transaction {
+        SchemaUtils.create(ApiLogTable)
+    }
     transaction {
         SchemaUtils.create(UrlTable)
         val statements = MigrationUtils.statementsRequiredForDatabaseMigration(UrlTable, UserTable)
