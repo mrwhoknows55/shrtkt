@@ -21,9 +21,8 @@ fun Application.configureCallLogging() {
             val status = call.response.status()
             val httpMethod = call.request.httpMethod
             val userAgent = call.request.userAgent()
-            val forwardedFor = call.request.header("X-Forwarded-Fo")
+            val forwardedFor = call.request.header("X-Forwarded-For")
             val realIp = call.request.header("X-Real-IP")
-            println("forwardedFor: $forwardedFor | realIp: $realIp")
             val ip = realIp ?: forwardedFor ?: call.request.local.remoteAddress
             val path = call.request.path()
             val logLine =
