@@ -239,7 +239,7 @@ fun Routing.urlShortenerRoutes() {
             if (request.expiresAt.isNullOrBlank()) {
                 null
             } else {
-                LocalDateTime.parse(request.expiresAt.orEmpty())
+                LocalDateTime.parse(request.expiresAt)
             }
         }.getOrElse {
             return UrlResponse(
