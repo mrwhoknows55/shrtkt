@@ -1,5 +1,6 @@
 [versions]
 exposed-version = "1.0.0-beta-5"
+kotlinx-dataframe = "1.0.0-Beta3"
 kotlin-version = "2.1.10"
 ktor-version = "3.2.2"
 logback-version = "1.5.18"
@@ -9,6 +10,7 @@ postgres-version = "42.7.7"
 ktor-server-core = { module = "io.ktor:ktor-server-core", version.ref = "ktor-version" }
 ktor-serialization-kotlinx-json = { module = "io.ktor:ktor-serialization-kotlinx-json", version.ref = "ktor-version" }
 ktor-server-content-negotiation = { module = "io.ktor:ktor-server-content-negotiation", version.ref = "ktor-version" }
+kotlinx-dataframe = { module = "org.jetbrains.kotlinx:dataframe", version.ref = "kotlinx-dataframe" }
 exposed-core = { module = "org.jetbrains.exposed:exposed-core", version.ref = "exposed-version" }
 exposed-jdbc = { module = "org.jetbrains.exposed:exposed-jdbc", version.ref = "exposed-version" }
 exposed-kotlin-datetime = { module = "org.jetbrains.exposed:exposed-kotlin-datetime", version.ref = "exposed-version" }

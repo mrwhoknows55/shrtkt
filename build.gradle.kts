@@ -58,6 +58,7 @@ dependencies {
     implementation(libs.exposed.jdbc)
     implementation(libs.exposed.migration)
     implementation(libs.exposed.kotlin.datetime)
+    implementation(libs.kotlinx.dataframe)
 
     implementation(libs.postgresql)
 

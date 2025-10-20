@@ -14,6 +14,8 @@ Simple URL Shortener API written in Ktor 🚀
 - **Bulk Shorten**: `POST /bulk/shorten` accepts an array of requests and returns per-item results with a summary
 - **Custom Short Code**: provide `shortCode` on create/update to set your own code
 - **Password Protection**: optional `password` required at redirect
+- ** Blacklist User**: Adds a user's API key to the blacklist.json file. Any API request using the same key will then be
+  blocked from accessing any resources.
 
 ## How to run the server
 

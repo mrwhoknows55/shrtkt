@@ -12,6 +12,7 @@ fun Application.module(isTesting: Boolean = false) {
     configureDatabases()
     configureCallLogging()
     configureSerialization()
+    configureAPIKeyBlacklist()
     configureAuth()
     // setup routes at last
     configureRouting()
