@@ -8,6 +8,9 @@ import kotlinx.datetime.Clock.System.now
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.datetime.toStdlibInstant
+import java.lang.System.currentTimeMillis
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
@@ -30,4 +33,10 @@ inline fun <R> runCatchingSafe(block: () -> R): Result<R> {
         }
         Result.failure(e)
     }
+}
+
+inline fun timeIt(block: () -> Unit): Duration {
+    val startTime = currentTimeMillis()
+    block()
+    return (currentTimeMillis() - startTime).milliseconds
 }
