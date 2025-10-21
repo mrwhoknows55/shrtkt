@@ -5,14 +5,19 @@ import io.ktor.server.application.*
 import io.ktor.server.plugins.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
+import io.ktor.utils.io.*
 import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.jdbc.andWhere
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import xyz.avdt.entities.UserTable
 import xyz.avdt.entities.UserTier
+import xyz.avdt.utils.runCatchingSafe
 
 
+const val HEADER_USER_ID = "User-Id"
+
+@OptIn(InternalAPI::class)
 fun Application.configureAuth() {
     val authCheckerPlugin = createApplicationPlugin(name = "AuthCheckerPlugin") {
         onCall { call ->
@@ -33,7 +38,7 @@ fun Application.configureAuth() {
             }
             val tierToCheck: UserTier? = if (route.contains("bulk")) UserTier.ENTERPRISE else null
             val userId = transaction {
-                runCatching {
+                runCatchingSafe {
                     UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }
                         .andWhere { tierToCheck?.let { UserTable.tier eq tierToCheck } ?: Op.TRUE }.limit(1)
                         .single()[UserTable.id]
@@ -45,6 +50,7 @@ fun Application.configureAuth() {
                     HttpStatusCode.Unauthorized, "Invalid API key or access tier not permitted."
                 )
             }
+            call.request.setHeader(HEADER_USER_ID, listOf(userId.toString()))
             println("Processing url $route for user_id $userId")
         }
     }

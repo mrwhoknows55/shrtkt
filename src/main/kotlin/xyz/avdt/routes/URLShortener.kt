@@ -5,7 +5,6 @@ import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.datetime.LocalDateTime
-import org.jetbrains.exposed.v1.core.Op
 import org.jetbrains.exposed.v1.core.SqlExpressionBuilder.plus
 import org.jetbrains.exposed.v1.core.count
 import org.jetbrains.exposed.v1.core.or
@@ -25,6 +24,7 @@ import xyz.avdt.models.BulkUrlResponse
 import xyz.avdt.models.BulkUrlResponse.Summary
 import xyz.avdt.models.UrlRequest
 import xyz.avdt.models.UrlResponse
+import xyz.avdt.plugins.HEADER_USER_ID
 import xyz.avdt.utils.Resource.Error
 import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
@@ -33,34 +33,14 @@ import kotlin.time.ExperimentalTime
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
 
-    suspend fun RoutingCall.getUserId(tierToCheck: UserTier? = null): Pair<Long?, Unit?> {
-        val apiKey = request.headers["x-api-key"].orEmpty()
-        if (apiKey.isEmpty()) {
-            return null to respond(
-                HttpStatusCode.Unauthorized, "Invalid/Missing api key"
-            )
-        }
-        val userId = transaction {
-            runCatching {
-                UserTable.select(UserTable.id).where { UserTable.apiKey eq apiKey }
-                    .andWhere { tierToCheck?.let { UserTable.tier eq tierToCheck } ?: Op.TRUE }.limit(1)
-                    .single()[UserTable.id]
-            }.onFailure {
-                it.printStackTrace()
-            }.getOrNull()
-        } ?: return (null to respond(
-            HttpStatusCode.Unauthorized, "Invalid API key or access tier not permitted."
-        ))
-        return userId to null
+    fun RoutingCall.getUserId(): Long {
+        val userId = request.headers[HEADER_USER_ID]?.toLongOrNull()
+        return userId!!
     }
 
     route("/shorten") {
         post {
-            val (id, error) = call.getUserId()
-            if (error != null) {
-                return@post error
-            }
-            val userId = id!!
+            val userId = call.getUserId()
             val params = call.receiveParameters()
             val encodedUrl = params["url"].orEmpty().trim()
             val longUrl = parseUrl(encodedUrl)?.toString() ?: return@post call.respond(
@@ -130,11 +110,7 @@ fun Routing.urlShortenerRoutes() {
         }
 
         put("{shortCode}") {
-            val (id, error) = call.getUserId()
-            if (error != null) {
-                return@put error
-            }
-            val userId = id!!
+            val userId = call.getUserId()
             val params = call.receiveParameters()
             val urlShortCode = call.request.pathVariables["shortCode"].orEmpty().ifBlank {
                 return@put call.respondText(
@@ -198,11 +174,7 @@ fun Routing.urlShortenerRoutes() {
         }
 
         delete("/{shortCode}") {
-            val (id, error) = call.getUserId()
-            if (error != null) {
-                return@delete error
-            }
-            val userId = id!!
+            val userId = call.getUserId()
             val shortCode = call.request.pathVariables["shortCode"]?.replace("\"", "").orEmpty().ifBlank {
                 return@delete call.respondText(
                     "wrong request format for short code", status = HttpStatusCode.BadRequest
@@ -294,11 +266,7 @@ fun Routing.urlShortenerRoutes() {
 
     route("/bulk") {
         post("/shorten") {
-            val (id, error) = call.getUserId(UserTier.ENTERPRISE)
-            if (error != null) {
-                return@post error
-            }
-            val userId = id!!
+            val userId = call.getUserId()
             val body = runCatching { call.receive<List<UrlRequest>>() }.getOrElse {
                 return@post call.respondText("Bad request", status = HttpStatusCode.BadRequest)
             }
@@ -436,12 +404,7 @@ fun Routing.urlShortenerRoutes() {
     }
 
     get("/urls") {
-        val (id, error) = call.getUserId()
-        if (error != null) {
-            return@get error
-        }
-        val userId = id!!
-
+        val userId = call.getUserId()
         val urls: List<Map<String, String>> = transaction {
             runCatching {
                 UrlTable.select(UrlTable.id, shortCode, redirectUrl).where {
