@@ -27,7 +27,6 @@ fun Application.configureCallLogging() {
             val path = call.request.path()
             val logLine =
                 "Time: $ts, HTTP method: $httpMethod, Path: $path, Status: $status, IP Address: $ip, User agent: $userAgent"
-            val startTime = Clock.System.now()
             CoroutineScope(Dispatchers.IO).launch {
                 transaction {
                     ApiLogTable.insert {
@@ -40,8 +39,6 @@ fun Application.configureCallLogging() {
                     }
                 }
             }
-            val diff = Clock.System.now() - startTime
-            println("log insert latency: $diff")
             logLine
         }
     }

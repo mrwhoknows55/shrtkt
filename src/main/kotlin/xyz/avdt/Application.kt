@@ -9,6 +9,7 @@ fun main(args: Array<String>) {
 }
 
 fun Application.module(isTesting: Boolean = false) {
+    configureLatencyMeasurement()
     configureDatabases()
     configureCallLogging()
     configureSerialization()
