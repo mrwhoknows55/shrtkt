@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.ktor)
     alias(libs.plugins.kotlin.plugin.serialization)
+    alias(libs.plugins.io.sentry)
 }
 
 group = "xyz.avdt"
@@ -62,6 +63,12 @@ dependencies {
 
     implementation(libs.postgresql)
 
+    implementation(libs.sentry.opentelemetry)
+    implementation(libs.opentelemetry.ktor)
+    implementation(libs.opentelemetry.exporter.otlp)
+    implementation(libs.opentelemetry.semconv)
+    implementation(libs.opentelemetry.sdk.extension.autoconfigure)
+
     testImplementation(libs.ktor.server.test.host)
     testImplementation(libs.kotlin.test.junit)
 }
@@ -76,3 +83,14 @@ tasks.test {
     }
 }
 
+sentry {
+    includeSourceContext = true
+    org = "na-twv"
+    projectName = "shrtkt"
+    authToken = System.getenv("SENTRY_AUTH_TOKEN")
+    includeSourceContext = true
+    includeDependenciesReport = true
+    autoInstallation {
+        enabled = true
+    }
+}

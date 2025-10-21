@@ -1,24 +1,48 @@
 package xyz.avdt.plugins
 
-import com.codahale.metrics.Slf4jReporter
+import io.ktor.http.*
+import io.ktor.http.HttpHeaders.UserAgent
 import io.ktor.server.application.*
-import io.ktor.server.metrics.dropwizard.*
-import io.ktor.server.plugins.calllogging.*
 import io.ktor.server.request.*
-import org.slf4j.event.Level
-import java.util.concurrent.TimeUnit
+import io.opentelemetry.api.trace.SpanKind
+import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
+import io.opentelemetry.instrumentation.ktor.v3_0.KtorServerTelemetry
+import io.opentelemetry.sdk.autoconfigure.AutoConfiguredOpenTelemetrySdk
+import io.opentelemetry.sdk.trace.export.BatchSpanProcessor
+import io.opentelemetry.semconv.ServiceAttributes
 
 fun Application.configureMonitoring() {
-    install(DropwizardMetrics) {
-        Slf4jReporter.forRegistry(registry)
-            .outputTo(this@configureMonitoring.log)
-            .convertRatesTo(TimeUnit.SECONDS)
-            .convertDurationsTo(TimeUnit.MILLISECONDS)
-            .build()
-            .start(10, TimeUnit.SECONDS)
-    }
-    install(CallLogging) {
-        level = Level.INFO
-        filter { call -> call.request.path().startsWith("/") }
+    System.setProperty("otel.metrics.exporter", "none")
+    System.setProperty("otel.logs.exporter", "none")
+    System.setProperty("otel.traces.exporter", "none")
+    val spanExporter = OtlpGrpcSpanExporter.builder().setEndpoint("https://shrtkt.onrender.com").build()
+
+    val openTelemetry = AutoConfiguredOpenTelemetrySdk.builder().addTracerProviderCustomizer { old, _ ->
+        old.addSpanProcessor(BatchSpanProcessor.builder(spanExporter).build())
+    }.addResourceCustomizer { oldResource, _ ->
+        oldResource.toBuilder().putAll(oldResource.attributes).put(ServiceAttributes.SERVICE_NAME, "shrtkt").build()
+    }.build().openTelemetrySdk
+
+    install(KtorServerTelemetry) {
+        setOpenTelemetry(openTelemetry)
+        capturedRequestHeaders(UserAgent, HEADER_SERVER_TIMING)
+        knownMethods(HttpMethod.DefaultMethods)
+
+
+        spanKindExtractor {
+            if (httpMethod == HttpMethod.Post) {
+                SpanKind.PRODUCER
+            } else {
+                SpanKind.CLIENT
+            }
+        }
+        attributesExtractor {
+            onStart {
+                attributes.put("start-time", System.currentTimeMillis())
+            }
+            onEnd {
+                attributes.put("end-time", System.currentTimeMillis())
+            }
+        }
     }
 }
