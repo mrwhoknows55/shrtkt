@@ -6,6 +6,7 @@ import io.sentry.Sentry
 import org.jetbrains.kotlinx.dataframe.DataFrame
 import org.jetbrains.kotlinx.dataframe.io.read
 import xyz.avdt.plugins.*
+import xyz.avdt.utils.runCatchingSafe
 
 fun main(args: Array<String>) {
     EngineMain.main(args)
@@ -22,7 +23,9 @@ fun Application.module(isTesting: Boolean = false) {
         configureMonitoring()
     }
 
-    val blacklist = DataFrame.read("blacklist.json")
+    val blacklist = runCatchingSafe {
+        DataFrame.read("$rootPath/blacklist.json")
+    }.onFailure { println(it) }.getOrNull()
     configureLatencyMeasurement()
     configureDatabases()
     configureCallLogging()

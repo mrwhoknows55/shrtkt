@@ -7,7 +7,10 @@ import org.jetbrains.kotlinx.dataframe.AnyFrame
 import org.jetbrains.kotlinx.dataframe.api.values
 import xyz.avdt.utils.timeIt
 
-fun Application.configureAPIKeyBlacklist(blacklist: AnyFrame) {
+fun Application.configureAPIKeyBlacklist(blacklist: AnyFrame?) {
+    if (blacklist == null) {
+        return
+    }
     val apiKeyBlacklistPlugin = createApplicationPlugin(name = "APIKeyBlacklistPlugin") {
         onCall { call ->
             val time = timeIt {
