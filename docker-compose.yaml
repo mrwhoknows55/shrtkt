@@ -30,6 +30,7 @@ services:
       DB_NAME: shrtkt
       DB_USER: postgres
       DB_PASSWORD: password
+      SENTRY_AUTH_TOKEN: sentry-token
     deploy:
       resources:
         limits:

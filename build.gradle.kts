@@ -87,7 +87,12 @@ sentry {
     includeSourceContext = true
     org = "na-twv"
     projectName = "shrtkt"
-    authToken = System.getenv("SENTRY_AUTH_TOKEN")
+    runCatching {
+        authToken = System.getenv("SENTRY_AUTH_TOKEN")
+        println("Sentry Token Last 4 chars= " + authToken.toString().takeLast(4))
+    }.onFailure {
+        println(it)
+    }
     includeSourceContext = true
     includeDependenciesReport = true
     autoInstallation {
