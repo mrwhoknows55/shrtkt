@@ -382,7 +382,7 @@ fun Routing.urlShortenerRoutes() {
                 UserTable.insert {
                     it[UserTable.name] = name
                     it[UserTable.apiKey] = apiKey
-                    it[UserTable.email] = email
+                    it[UserTable.email] = email.lowercase()
                     it[UserTable.tier] = tier
                 }
             }
@@ -393,7 +393,7 @@ fun Routing.urlShortenerRoutes() {
         }.onFailure {
             if (it.cause.toString().contains("duplicate")) {
                 return@post call.respond(
-                    HttpStatusCode.Created, "User created"
+                    HttpStatusCode.Created, "User already exists try with other email address"
                 )
             }
             it.printStackTrace()

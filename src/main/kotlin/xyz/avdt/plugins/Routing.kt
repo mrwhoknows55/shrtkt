@@ -10,4 +10,4 @@ fun Application.configureRouting() = routing {
     urlShortenerRoutes()
 }
 
-val nonAuthRoutes = arrayOf("/", "/status", "/top-urls", "/redirect", "/stats/top-urls")
+val nonAuthRoutes = arrayOf("/", "/status", "/top-urls", "/redirect", "/stats/top-urls", "/user")
