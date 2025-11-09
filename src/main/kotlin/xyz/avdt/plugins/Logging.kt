@@ -27,6 +27,9 @@ fun Application.configureCallLogging() {
             val path = call.request.path()
             val logLine =
                 "Time: $ts, HTTP method: $httpMethod, Path: $path, Status: $status, IP Address: $ip, User agent: $userAgent"
+            if (path.contains("opentelemetry")) {
+                return@format logLine
+            }
             CoroutineScope(Dispatchers.IO).launch {
                 transaction {
                     ApiLogTable.insert {
