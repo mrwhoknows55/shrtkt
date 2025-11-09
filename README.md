@@ -17,6 +17,14 @@ Simple URL Shortener API written in Ktor 🚀
 - ** Blacklist User**: Adds a user's API key to the blacklist.json file. Any API request using the same key will then be
   blocked from accessing any resources.
 
+## API Documentation
+
+Test the API directly with Postman collection:
+
+[<img src="https://run.pstmn.io/button.svg" alt="Run In Postman" style="width: 128px; height: 32px;">](https://www.postman.com/mrwhoknows55-apis/workspace/shrtkt/collection/49921833-4cad0f6e-3cb2-418f-8cd2-90daa2904c75?action=share&creator=49921833&active-environment=49921833-9822e268-e4b3-4eda-ad67-d98405cce4f4)
+
+Or use [Bruno](https://usebruno.com/) API client with the collection in the `bruno/` directory.
+
 ## How to run the server
 
 Run this command and server should be up, on port 8080
