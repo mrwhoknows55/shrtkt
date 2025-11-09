@@ -20,7 +20,7 @@ fun Application.module(isTesting: Boolean = false) {
             options.tracesSampleRate = 1.0
             options.isDebug = false
         }
-        configureMonitoring()
+//        configureMonitoring()
     }
 
     val blacklist = runCatchingSafe {
