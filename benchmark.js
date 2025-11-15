@@ -8,7 +8,12 @@ export const options = {
   },
 };
 
+const API_KEY = __ENV.API_KEY || 'sk-test-alice';
+
 export function setup() {
+  if (!API_KEY) {
+    console.error('API_KEY environment variable is required. Set it with: k6 run --env API_KEY=your-api-key benchmark.js');
+  }
   console.log('Starting URL shortener load test...');
 }
 
@@ -20,6 +25,7 @@ export default function () {
   const shortenResponse = http.post(`${baseUrl}/shorten`, targetLoc, {
     headers: {
       'Content-Type': 'text/plain',
+      'x-api-key': API_KEY,
     },
     tags: { name: 'shorten_url' },
   });
