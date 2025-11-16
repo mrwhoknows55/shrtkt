@@ -22,6 +22,7 @@ import xyz.avdt.entities.UserTable
 import xyz.avdt.entities.UserTier
 import xyz.avdt.models.BulkUrlResponse
 import xyz.avdt.models.BulkUrlResponse.Summary
+import xyz.avdt.models.ShortUrlCacheResponse
 import xyz.avdt.models.UrlRequest
 import xyz.avdt.models.UrlResponse
 import xyz.avdt.plugins.HEADER_USER_ID
@@ -29,6 +30,8 @@ import xyz.avdt.utils.Resource.Error
 import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
 import kotlin.time.ExperimentalTime
+
+val cache: HashMap<String, ShortUrlCacheResponse> = hashMapOf()
 
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
@@ -299,6 +302,12 @@ fun Routing.urlShortenerRoutes() {
             "wrong request format for short code", status = HttpStatusCode.BadRequest
         )
         val password = call.request.queryParameters["password"]
+        val cacheData = cache[code]
+        if (cacheData != null && cacheData.password == password) {
+            println("cache hit for code: $code")
+            return@get call.respondRedirect(cacheData.redirectUrl)
+        }
+        println("cache miss for code: $code")
         val result = transaction {
             val codeL = code.trim().toLongOrNull() ?: 0
             runCatching {
@@ -330,6 +339,9 @@ fun Routing.urlShortenerRoutes() {
                 }
             }
             println("redirecting $code to its target destination")
+            println("saving it in cache")
+            val data = ShortUrlCacheResponse(shortCode = code, redirectUrl = url, password = urlPassword)
+            cache[code] = data
             return@get call.respondRedirect(url)
         }
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)

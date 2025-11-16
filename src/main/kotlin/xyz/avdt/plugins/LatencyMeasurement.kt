@@ -24,7 +24,7 @@ fun Application.configureLatencyMeasurement() {
                 }?.milliseconds
 
                 totalLatency?.let {
-                    val header = HEADER_SERVER_TIMING to "total;dur=${it.inWholeMilliseconds}"
+                    val header = HEADER_SERVER_TIMING to "total;dur=${it}"
                     call.response.headers.append(header.first, header.second)
                 }
             }

@@ -56,7 +56,7 @@ fun Application.configureAuth() {
                 println("Processing url $route for user_id $userId")
             }
             call.response.headers.append(
-                HEADER_SERVER_TIMING, "auth;dur=${time.inWholeMilliseconds}"
+                HEADER_SERVER_TIMING, "auth;dur=${time}"
             )
             println("authChecker middleware took $time")
         }
