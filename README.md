@@ -87,8 +87,11 @@ Format: `YYYY-MM-DDTHH:MM:SS` (ISO 8601)
 To run the benchmark:
 
 ```shell 
-  k6 run benchmark.js -u 400 -i 400 # concurrent users/iterations count
+  k6 run benchmark/benchmark.js -u 400 -i 400 # concurrent users/iterations count
 ```
+
+Cache performance benchmarks are available in the `benchmark/` directory. Run `benchmark/compare-cache-performance.sh`
+to compare performance with and without cache.
 
 ### Latency:
 

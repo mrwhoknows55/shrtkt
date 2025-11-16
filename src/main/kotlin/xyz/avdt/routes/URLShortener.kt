@@ -13,6 +13,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.select
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import org.jetbrains.exposed.v1.jdbc.update
+import xyz.avdt.entities.MemoryCache
 import xyz.avdt.entities.UrlTable
 import xyz.avdt.entities.UrlTable.deletedAt
 import xyz.avdt.entities.UrlTable.expiredAt
@@ -31,10 +32,11 @@ import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
 import kotlin.time.ExperimentalTime
 
-val cache: HashMap<String, ShortUrlCacheResponse> = hashMapOf()
+const val ENABLE_CACHE = true
 
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
+    val cache = MemoryCache(limit = 1000)
 
     fun RoutingCall.getUserId(): Long {
         val userId = request.headers[HEADER_USER_ID]?.toLongOrNull()
@@ -302,10 +304,13 @@ fun Routing.urlShortenerRoutes() {
             "wrong request format for short code", status = HttpStatusCode.BadRequest
         )
         val password = call.request.queryParameters["password"]
-        val cacheData = cache[code]
-        if (cacheData != null && cacheData.password == password) {
-            println("cache hit for code: $code")
-            return@get call.respondRedirect(cacheData.redirectUrl)
+        if (ENABLE_CACHE) {
+            val cacheData = cache.fetch(code)
+            if (cacheData != null && cacheData.password == password) {
+                println("cache hit for code: $code")
+                call.response.header("Cache-Status", "hit")
+                return@get call.respondRedirect(cacheData.redirectUrl)
+            }
         }
         println("cache miss for code: $code")
         val result = transaction {
@@ -339,9 +344,12 @@ fun Routing.urlShortenerRoutes() {
                 }
             }
             println("redirecting $code to its target destination")
-            println("saving it in cache")
-            val data = ShortUrlCacheResponse(shortCode = code, redirectUrl = url, password = urlPassword)
-            cache[code] = data
+            if (ENABLE_CACHE) {
+                println("saving it in cache")
+                val data = ShortUrlCacheResponse(shortCode = code, redirectUrl = url, password = urlPassword)
+                cache.add(code, data)
+            }
+            call.response.header("Cache-Status", "miss")
             return@get call.respondRedirect(url)
         }
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)

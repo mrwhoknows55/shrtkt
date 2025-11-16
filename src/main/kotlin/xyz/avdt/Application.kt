@@ -7,6 +7,7 @@ import org.jetbrains.kotlinx.dataframe.DataFrame
 import org.jetbrains.kotlinx.dataframe.io.read
 import xyz.avdt.plugins.*
 import xyz.avdt.utils.runCatchingSafe
+import java.io.File
 
 fun main(args: Array<String>) {
     EngineMain.main(args)
@@ -24,7 +25,9 @@ fun Application.module(isTesting: Boolean = false) {
     }
 
     val blacklist = runCatchingSafe {
-        DataFrame.read("$rootPath/blacklist.json")
+        val root = System.getProperty("user.dir")
+        val path = File(root, "blacklist.json")
+        DataFrame.read(path)
     }.onFailure { println(it) }.getOrNull()
     configureLatencyMeasurement()
     configureDatabases()

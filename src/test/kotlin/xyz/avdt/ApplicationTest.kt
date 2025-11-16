@@ -77,6 +77,43 @@ class ApplicationTest {
         assertEquals(targetLoc, resultLocation)
     }
 
+    @Test
+    fun testRedirectUsesCacheAfterFirstRequest() = testApplication {
+        setup()
+        val targetLoc = "https://avdt.xyz"
+
+        val shortRes = client.post("/shorten") {
+            setBodyX(targetLoc)
+            addXApiKey()
+        }
+
+        assertEquals(HttpStatusCode.Created, shortRes.status)
+        val shortCode = json.decodeFromString<JsonObject>(shortRes.bodyAsText())["shortCode"]?.toString().orEmpty()
+            .replace("\"", "")
+        assert(shortCode.isNotEmpty())
+
+        val firstRedirectRes = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Found, firstRedirectRes.status)
+        val firstLocation = firstRedirectRes.headers["Location"]
+        assertEquals(targetLoc, firstLocation)
+        val firstCacheStatus = firstRedirectRes.headers["Cache-Status"]
+        assertEquals("miss", firstCacheStatus)
+
+        val secondRedirectRes = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Found, secondRedirectRes.status)
+        val secondLocation = secondRedirectRes.headers["Location"]
+        assertEquals(targetLoc, secondLocation)
+        val secondCacheStatus = secondRedirectRes.headers["Cache-Status"]
+        assertEquals("hit", secondCacheStatus)
+
+        val thirdRedirectRes = client.get("/redirect?code=$shortCode")
+        assertEquals(HttpStatusCode.Found, thirdRedirectRes.status)
+        val thirdLocation = thirdRedirectRes.headers["Location"]
+        assertEquals(targetLoc, thirdLocation)
+        val thirdCacheStatus = thirdRedirectRes.headers["Cache-Status"]
+        assertEquals("hit", thirdCacheStatus)
+    }
+
 
     @Test
     fun testShortenWithCustomShortCodeAndRedirect() = testApplication {
