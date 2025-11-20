@@ -32,7 +32,8 @@ import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
 import kotlin.time.ExperimentalTime
 
-const val ENABLE_CACHE = true
+const val ENABLE_MEMORY_CACHE = true
+const val ENABLE_CLIENT_CACHE = true
 
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
@@ -304,11 +305,14 @@ fun Routing.urlShortenerRoutes() {
             "wrong request format for short code", status = HttpStatusCode.BadRequest
         )
         val password = call.request.queryParameters["password"]
-        if (ENABLE_CACHE) {
+        if (ENABLE_MEMORY_CACHE) {
             val cacheData = cache.fetch(code)
             if (cacheData != null && cacheData.password == password) {
                 println("cache hit for code: $code")
                 call.response.header("Cache-Status", "hit")
+                if (ENABLE_CLIENT_CACHE) {
+                    call.response.header(HttpHeaders.CacheControl, CacheControl.MaxAge(60).toString())
+                }
                 return@get call.respondRedirect(cacheData.redirectUrl)
             }
         }
@@ -344,12 +348,15 @@ fun Routing.urlShortenerRoutes() {
                 }
             }
             println("redirecting $code to its target destination")
-            if (ENABLE_CACHE) {
+            if (ENABLE_MEMORY_CACHE) {
                 println("saving it in cache")
                 val data = ShortUrlCacheResponse(shortCode = code, redirectUrl = url, password = urlPassword)
                 cache.add(code, data)
             }
             call.response.header("Cache-Status", "miss")
+            if (ENABLE_CLIENT_CACHE) {
+                call.response.header(HttpHeaders.CacheControl, CacheControl.MaxAge(60).toString())
+            }
             return@get call.respondRedirect(url)
         }
         return@get call.respondText("URL not found", status = HttpStatusCode.NotFound)

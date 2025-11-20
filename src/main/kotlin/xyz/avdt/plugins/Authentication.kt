@@ -45,7 +45,12 @@ fun Application.configureAuth() {
                             .andWhere { tierToCheck?.let { UserTable.tier eq tierToCheck } ?: Op.TRUE }.limit(1)
                             .single()[UserTable.id]
                     }.onFailure {
-                        it.printStackTrace()
+                        when (it) {
+                            is NoSuchFileException -> Unit
+                            else -> {
+                                it.printStackTrace()
+                            }
+                        }
                     }.getOrNull()
                 } ?: run {
                     return@onCall call.respond(
