@@ -1,6 +1,7 @@
 package xyz.avdt.routes
 
 import io.ktor.http.*
+import io.ktor.server.config.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
@@ -30,6 +31,7 @@ import xyz.avdt.plugins.HEADER_USER_ID
 import xyz.avdt.utils.Resource.Error
 import xyz.avdt.utils.Resource.Result
 import xyz.avdt.utils.currentLocalDateTime
+import xyz.avdt.utils.runCatchingSafe
 import kotlin.time.ExperimentalTime
 
 const val ENABLE_MEMORY_CACHE = true
@@ -37,7 +39,9 @@ const val ENABLE_CLIENT_CACHE = true
 
 @OptIn(ExperimentalTime::class)
 fun Routing.urlShortenerRoutes() {
-    val cache = MemoryCache(limit = 1000)
+    val cache = runCatchingSafe {
+        MemoryCache(environment.config.tryGetString("ktor.deployment.redis.url")!!)
+    }.getOrThrow()
 
     fun RoutingCall.getUserId(): Long {
         val userId = request.headers[HEADER_USER_ID]?.toLongOrNull()

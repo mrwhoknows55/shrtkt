@@ -61,6 +61,7 @@ dependencies {
     implementation(libs.exposed.kotlin.datetime)
     implementation(libs.kotlinx.dataframe)
 
+    implementation(libs.jedis)
     implementation(libs.postgresql)
 
     implementation(libs.sentry.opentelemetry)

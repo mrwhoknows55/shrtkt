@@ -1,30 +1,26 @@
 package xyz.avdt.entities
 
-import org.apache.commons.collections4.map.LRUMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import redis.clients.jedis.Jedis
 import xyz.avdt.models.ShortUrlCacheResponse
+import xyz.avdt.utils.runCatchingSafe
+import java.net.URI
 
-class MemoryCache(
-    limit: Int,
-) {
-    private val cache: LRUMap<String, ShortUrlCacheResponse> = LRUMap(limit)
+class MemoryCache(url: String) {
+    private val client = Jedis(URI.create(url))
 
-    fun add(key: String, value: ShortUrlCacheResponse) {
-        cache[key] = value
+    suspend fun add(key: String, value: ShortUrlCacheResponse) = withContext(Dispatchers.IO) {
+        client.set(key, Json.encodeToString(value))
+        println("added key = $key to redis")
     }
 
 
-    fun remove(key: String) {
-        if (cache.contains(key)) {
-            cache.remove(key)
-        }
+    suspend fun fetch(key: String): ShortUrlCacheResponse? = withContext(Dispatchers.IO) {
+        val value = runCatchingSafe {
+            Json.decodeFromString<ShortUrlCacheResponse>(client.get(key)!!)
+        }.onFailure { it.printStackTrace() }.getOrNull()
+        return@withContext value
     }
-
-    fun fetch(key: String): ShortUrlCacheResponse? {
-        return if (cache.contains(key) && cache[key] != null) {
-            cache[key]!!
-        } else {
-            null
-        }
-    }
-
 }

@@ -11,6 +11,8 @@ ktor:
       name: "$DB_NAME:shrtkt"
       user: "$DB_USER:postgres"
       password: "$DB_PASSWORD:password"
+    redis:
+      url: "$REDIS_URL:redis://default@0.0.0.0:6379"
     watch:
       - classes
       - resources
