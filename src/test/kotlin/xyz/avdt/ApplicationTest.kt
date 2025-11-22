@@ -5,13 +5,16 @@ import io.ktor.client.request.forms.*
 import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.server.testing.*
+import kotlinx.coroutines.delay
 import kotlinx.datetime.LocalDateTime
 import kotlinx.datetime.TimeZone.Companion.currentSystemDefault
 import kotlinx.datetime.toLocalDateTime
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import org.junit.jupiter.api.Timeout
 import xyz.avdt.models.BulkUrlResponse
 import xyz.avdt.utils.currentLocalDateTime
+import java.util.concurrent.TimeUnit
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
@@ -19,6 +22,7 @@ import kotlin.time.Clock
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.ExperimentalTime
 
+@Timeout(value = 90, unit = TimeUnit.SECONDS)
 class ApplicationTest {
     val json = Json {
         isLenient = true
@@ -114,7 +118,6 @@ class ApplicationTest {
         assertEquals("hit", thirdCacheStatus)
     }
 
-
     @Test
     fun testShortenWithCustomShortCodeAndRedirect() = testApplication {
         setup()
@@ -143,7 +146,6 @@ class ApplicationTest {
         }
         assertEquals(HttpStatusCode.Conflict, shortResConflict.status)
     }
-
 
     @OptIn(ExperimentalTime::class)
     @Test
@@ -438,7 +440,6 @@ class ApplicationTest {
         }
     }
 
-
     @Test
     fun testPutRequestForCustomCode() = testApplication {
         setup()
@@ -474,7 +475,6 @@ class ApplicationTest {
             addXApiKey()
         }
     }
-
 
     @OptIn(ExperimentalTime::class)
     @Test
@@ -554,6 +554,32 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.Unauthorized, bulkResInvalidTier.status)
     }
 
+    @Test
+    fun testBasicRateLimiter() = testApplication {
+        setup()
+        val targetLoc = "https://avdt.xyz"
+
+        suspend fun shorten() = client.post("/shorten") {
+            setBodyX(targetLoc)
+            addXApiKey()
+        }
+
+        val shortRes1 = shorten()
+        assertEquals(HttpStatusCode.Created, shortRes1.status)
+        val shortCode = json.decodeFromString<JsonObject>(shortRes1.bodyAsText())["shortCode"]
+        assert(shortCode != null)
+
+        repeat(99) {
+            shorten()
+            delay(50)
+        }
+        val shortRes100 = shorten()
+        assertEquals(HttpStatusCode.Created, shortRes100.status)
+
+        val shortRes101 = shorten()
+        assertEquals(HttpStatusCode.TooManyRequests, shortRes101.status)
+    }
+
     fun ApplicationTestBuilder.setup() {
         application {
             module(true)
@@ -562,7 +588,6 @@ class ApplicationTest {
             followRedirects = false
         }
     }
-
 
     init {
         testApplication {

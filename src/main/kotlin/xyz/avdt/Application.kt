@@ -31,6 +31,11 @@ fun Application.module(isTesting: Boolean = false) {
     val url = environment.config.tryGetString("ktor.deployment.redis.url").orEmpty().ifBlank { "redis://0.0.0.0:6379" }
     val jedis = Jedis(URI.create(url))
     val cache = MemoryCache(jedis)
+    if (isTesting) {
+        jedis.use {
+            it.del("rl:localhost")
+        }
+    }
 
     val blacklist = runCatchingSafe {
         val root = System.getProperty("user.dir")
