@@ -10,6 +10,7 @@ import org.jetbrains.exposed.v1.jdbc.insert
 import org.jetbrains.exposed.v1.jdbc.transactions.transaction
 import xyz.avdt.entities.ApiLogTable
 import xyz.avdt.utils.currentLocalDateTime
+import xyz.avdt.utils.getIpAddress
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 
@@ -21,9 +22,7 @@ fun Application.configureCallLogging() {
             val status = call.response.status()
             val httpMethod = call.request.httpMethod
             val userAgent = call.request.userAgent()
-            val forwardedFor = call.request.header("X-Forwarded-For")
-            val realIp = call.request.header("X-Real-IP")
-            val ip = realIp ?: forwardedFor ?: call.request.local.remoteAddress
+            val ip = call.getIpAddress()
             val path = call.request.path()
             val logLine =
                 "Time: $ts, HTTP method: $httpMethod, Path: $path, Status: $status, IP Address: $ip, User agent: $userAgent"

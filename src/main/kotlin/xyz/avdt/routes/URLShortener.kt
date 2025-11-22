@@ -37,8 +37,9 @@ const val ENABLE_MEMORY_CACHE = true
 const val ENABLE_CLIENT_CACHE = true
 
 @OptIn(ExperimentalTime::class)
-fun Routing.urlShortenerRoutes() {
-    val cache = MemoryCache(environment)
+fun Routing.urlShortenerRoutes(
+    cache: MemoryCache,
+) {
 
     fun RoutingCall.getUserId(): Long {
         val userId = request.headers[HEADER_USER_ID]?.toLongOrNull()

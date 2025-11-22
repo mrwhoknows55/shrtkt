@@ -1,19 +1,13 @@
 package xyz.avdt.entities
 
-import io.ktor.server.application.*
-import io.ktor.server.config.*
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import redis.clients.jedis.Jedis
 import xyz.avdt.models.ShortUrlCacheResponse
 import xyz.avdt.utils.runCatchingSafe
-import java.net.URI
 
-class MemoryCache(environment: ApplicationEnvironment) {
-    val url = environment.config.tryGetString("ktor.deployment.redis.url").orEmpty().ifBlank { "redis://0.0.0.0:6379" }
-    private val client = Jedis(URI.create(url))
-
+class MemoryCache(private val client: Jedis) {
     suspend fun add(key: String, value: ShortUrlCacheResponse) = withContext(Dispatchers.IO) {
         runCatchingSafe {
             client.set(key, Json.encodeToString(value))

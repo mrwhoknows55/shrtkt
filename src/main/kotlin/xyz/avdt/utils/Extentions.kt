@@ -3,6 +3,7 @@ package xyz.avdt.utils
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.config.*
+import io.ktor.server.request.*
 import io.ktor.utils.io.*
 import kotlinx.datetime.Clock.System.now
 import kotlinx.datetime.TimeZone
@@ -39,4 +40,15 @@ inline fun timeIt(block: () -> Unit): Duration {
     val startTime = currentTimeMillis()
     block()
     return (currentTimeMillis() - startTime).milliseconds
+}
+
+/**
+ * Returns Client's real IP address by checking in various headers
+ */
+fun ApplicationCall.getIpAddress(): String {
+    val realIp = request.header("X-Real-IP") ?: request.header("CF-Connecting-IP") ?: request.header("True-Client-IP")
+    val forwardedFor = request.header("X-Forwarded-For")
+    val remoteAddress = request.local.remoteAddress
+    val ip = realIp ?: forwardedFor ?: remoteAddress
+    return ip
 }
